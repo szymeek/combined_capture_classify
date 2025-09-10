@@ -11,7 +11,7 @@ Custom delays: Position 1 (Alt) = 500ms, Positions 2-3 (Q/E) = 200ms
 Dependencies: mss, opencv-python, pynput, pywin32, Pillow, numpy
 
 Usage:
-python combined_capture_classify.py --title "MTA: San Andreas" --save-dir screenshots --templates-path templates
+python combined_capture_classify.py --templates-path templates --save-dir screenshots
 """
 
 from __future__ import annotations
@@ -52,11 +52,11 @@ class KeypressCaptureClassifier:
 
         # Crop coordinates for each position (26x26 crops)
         self._crop_coords = {
-            1: (39, 943),  # Alt position
-            2: (97, 943),  # First Q/E position
-            3: (155, 943), # Second Q/E position
+            1: (41, 749),  # Alt position
+            2: (105, 749),  # First Q/E position
+            3: (169, 749), # Second Q/E position
         }
-        self._crop_size = 26
+        self._crop_size = 31
 
         self._lock = threading.Lock()
         self._cycle_position = 0
@@ -85,6 +85,9 @@ class KeypressCaptureClassifier:
 
     def _safe_grab(self) -> Optional[np.ndarray]:
         try:
+            if self.info is None:
+                print("[warn] Window info is None, cannot capture.")
+                return None
             bbox = get_capture_bbox(self.info)
             with mss.mss() as sct:
                 monitor = {
