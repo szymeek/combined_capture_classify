@@ -52,11 +52,11 @@ class KeypressCaptureClassifier:
 
         # Crop coordinates for each position (26x26 crops)
         self._crop_coords = {
-            1: (41, 749),  # Alt position
-            2: (105, 749),  # First Q/E position
-            3: (169, 749), # Second Q/E position
+            1: (39, 943),  # Alt position
+            2: (97, 943),  # First Q/E position
+            3: (155, 943), # Second Q/E position
         }
-        self._crop_size = 31
+        self._crop_size = 26
 
         self._lock = threading.Lock()
         self._cycle_position = 0

@@ -4,3 +4,4 @@ pillow
 pynput
 pywin32
 mss
+pyserial

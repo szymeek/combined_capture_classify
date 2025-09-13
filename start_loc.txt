@@ -1,0 +1,29 @@
+wymiary dla rozdzielczości 1920x1080
+
+skala 1.0
+wymiar wycinka 26x26
+pozycja 1: x, y = 39, 943           # top-left corner
+pozycja 2: x, y = 97, 943           # top-left corner
+pozycja 3: x, y = 155, 943           # top-left corner
+
+
+skala 1.3
+wymiar wycinka 36x36
+pozycja 1: x, y = 50, 901           # top-left corner
+pozycja 2: x, y = 125, 901           # top-left corner
+pozycja 3: x, y = 200, 901           # top-left corner
+
+
+wymiary dla rozdzielczości 1600x900
+
+skala 1.0
+wymiar wycinka 26x26
+pozycja 1: x, y = 38, 762           # top-left corner
+pozycja 2: x, y = 96, 762           # top-left corner
+pozycja 3: x, y = 154, 762           # top-left corner
+
+skala 1.3
+wymiar wycinka 36x36
+pozycja 1: x, y = 49, 720           # top-left corner
+pozycja 2: x, y = 124, 720           # top-left corner
+pozycja 3: x, y = 199, 720           # top-left corner
