@@ -6,11 +6,11 @@ import serial
 import serial.tools.list_ports
 import time
 from typing import Optional, List
-from config import ESP32_BAUDRATE, ESP32_TIMEOUT
+import config
 
 class ESP32Serial:
     def __init__(self, port: Optional[str] = None):
-        self.port = port
+        self.port = port or config.ESP32_PORT
         self.connection: Optional[serial.Serial] = None
         self.is_connected = False
     
@@ -36,21 +36,28 @@ class ESP32Serial:
     def connect(self, port: str) -> bool:
         """Connect to specific COM port"""
         try:
-            self.connection = serial.Serial(port, ESP32_BAUDRATE, timeout=ESP32_TIMEOUT)
+            self.connection = serial.Serial(
+                port, 
+                config.ESP32_BAUDRATE, 
+                timeout=config.ESP32_TIMEOUT
+            )
             self.port = port
             self.is_connected = True
             time.sleep(2)  # ESP32 initialization delay
-            print(f"✅ Connected to ESP32 on {port}")
+            if config.VERBOSE_LOGGING:
+                print(f"✅ Connected to ESP32 on {port}")
             return True
         except Exception as e:
-            print(f"❌ Failed to connect to {port}: {e}")
+            if config.VERBOSE_LOGGING:
+                print(f"❌ Failed to connect to {port}: {e}")
             self.is_connected = False
             return False
     
     def send_command(self, command: str) -> bool:
         """Send command to ESP32 - optimized"""
         if not self.is_connected or not self.connection:
-            print("❌ ESP32 not connected")
+            if config.VERBOSE_LOGGING:
+                print("❌ ESP32 not connected")
             return False
         
         try:
@@ -61,11 +68,13 @@ class ESP32Serial:
             time.sleep(0.05)  # Reduced from 0.1 to 0.05
             if self.connection.in_waiting > 0:
                 response = self.connection.readline().decode().strip()
-                print(f"ESP32: {response}")
+                if config.VERBOSE_LOGGING:
+                    print(f"ESP32: {response}")
             
             return True
         except Exception as e:
-            print(f"❌ Error sending command '{command}': {e}")
+            if config.VERBOSE_LOGGING:
+                print(f"❌ Error sending command '{command}': {e}")
             return False
     
     def disconnect(self):
@@ -73,4 +82,5 @@ class ESP32Serial:
         if self.connection:
             self.connection.close()
             self.is_connected = False
-            print("👋 ESP32 disconnected")
+            if config.VERBOSE_LOGGING:
+                print("👋 ESP32 disconnected")
