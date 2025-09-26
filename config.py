@@ -1,15 +1,171 @@
 # config.py
 """
-Configuration settings for ESP32-S3 communication
+Centralized Configuration Settings for MTA ESP32-S3 Automation
+
+All important configuration variables are defined here for easy modification.
+Change values here instead of modifying individual source files.
 """
+
+# ============================================================================
+# TEMPLATES AND PATHS
+# ============================================================================
+
+# Path to templates folder containing 'q' and 'e' subdirectories
+TEMPLATES_PATH = "templates"
+
+# Directory to save screenshots and results
+SCREENSHOTS_DIR = "screenshots"
+
+# Results CSV filename
+RESULTS_CSV = "results.csv"
+
+# ============================================================================
+# SCREEN CAPTURE SETTINGS
+# ============================================================================
+
+# Target window title to capture from
+WINDOW_TITLE = "MTA: San Andreas"
+
+# Crop coordinates for the 3 sequential glyph positions (x, y)
+CROP_COORDINATES = {
+    1: (39, 943),   # First glyph position
+    2: (97, 943),   # Second glyph position  
+    3: (155, 943),  # Third glyph position
+}
+
+# Size of each crop (width x height in pixels)
+CROP_SIZE = 26
+
+# ============================================================================
+# TIMING SETTINGS
+# ============================================================================
+
+# Delay after Alt press before first capture (seconds)
+INITIAL_DELAY = 0.5
+
+# Delays before each capture [pos1, pos2, pos3] (seconds)
+CAPTURE_DELAYS = [0.0, 0.2, 0.2]
+
+# Debounce time between Alt presses (seconds)
+ALT_DEBOUNCE_TIME = 0.5
+
+# ESP32 random delay range before sending commands (milliseconds)
+ESP_DELAY_MIN = 50
+ESP_DELAY_MAX = 200
+
+# ============================================================================
+# ESP32 COMMUNICATION
+# ============================================================================
 
 # ESP32 Serial Configuration
 ESP32_BAUDRATE = 115200
 ESP32_TIMEOUT = 1.0
 
-# Classification confidence thresholds
+# ESP32 port (None for auto-detection)
+ESP32_PORT = None  # e.g., "COM3" or None for auto-detect
+
+# Keypress delay on ESP32 side (milliseconds)
+KEYPRESS_DELAY_MS = 50
+
+# ============================================================================
+# CLASSIFICATION SETTINGS
+# ============================================================================
+
+# Minimum confidence required to trigger ESP action
 MIN_CONFIDENCE_FOR_ESP_ACTION = 0.6
+
+# High confidence threshold for classification
 HIGH_CONFIDENCE_THRESHOLD = 0.8
 
-# Timing settings
-KEYPRESS_DELAY_MS = 50  # Matches ESP32 delay
+# Template matching confidence threshold
+TEMPLATE_CONFIDENCE_THRESHOLD = 0.7
+
+# ============================================================================
+# WINDOW MANAGEMENT
+# ============================================================================
+
+# Whether to bring MTA window to foreground on startup
+BRING_WINDOW_TO_FOREGROUND = True
+
+# ============================================================================
+# LOGGING AND DEBUG
+# ============================================================================
+
+# Enable verbose logging
+VERBOSE_LOGGING = True
+
+# Save cropped images for debugging
+SAVE_CROPPED_IMAGES = True
+
+# Log classification details to CSV
+LOG_TO_CSV = True
+
+# ============================================================================
+# VALIDATION FUNCTIONS
+# ============================================================================
+
+def validate_config():
+    """Validate configuration settings"""
+    errors = []
+    
+    # Validate ESP delay range
+    if ESP_DELAY_MIN >= ESP_DELAY_MAX:
+        errors.append("ESP_DELAY_MIN must be less than ESP_DELAY_MAX")
+    
+    if ESP_DELAY_MIN < 0 or ESP_DELAY_MAX < 0:
+        errors.append("ESP delay values must be non-negative")
+    
+    # Validate crop size
+    if CROP_SIZE <= 0:
+        errors.append("CROP_SIZE must be positive")
+    
+    # Validate timing settings
+    if INITIAL_DELAY < 0:
+        errors.append("INITIAL_DELAY must be non-negative")
+    
+    if any(delay < 0 for delay in CAPTURE_DELAYS):
+        errors.append("All CAPTURE_DELAYS must be non-negative")
+    
+    # Validate confidence thresholds
+    if not (0 <= MIN_CONFIDENCE_FOR_ESP_ACTION <= 1):
+        errors.append("MIN_CONFIDENCE_FOR_ESP_ACTION must be between 0 and 1")
+    
+    if not (0 <= HIGH_CONFIDENCE_THRESHOLD <= 1):
+        errors.append("HIGH_CONFIDENCE_THRESHOLD must be between 0 and 1")
+    
+    if not (0 <= TEMPLATE_CONFIDENCE_THRESHOLD <= 1):
+        errors.append("TEMPLATE_CONFIDENCE_THRESHOLD must be between 0 and 1")
+    
+    return errors
+
+# ============================================================================
+# CONFIGURATION SUMMARY
+# ============================================================================
+
+def print_config_summary():
+    """Print a summary of current configuration"""
+    print("=" * 60)
+    print("CONFIGURATION SUMMARY")
+    print("=" * 60)
+    print(f"Templates Path: {TEMPLATES_PATH}")
+    print(f"Window Title: {WINDOW_TITLE}")
+    print(f"Crop Size: {CROP_SIZE}x{CROP_SIZE}")
+    print(f"Crop Coordinates: {CROP_COORDINATES}")
+    print(f"Initial Delay: {INITIAL_DELAY}s")
+    print(f"Capture Delays: {CAPTURE_DELAYS}")
+    print(f"ESP Delay Range: {ESP_DELAY_MIN}-{ESP_DELAY_MAX}ms")
+    print(f"ESP Port: {ESP32_PORT or 'Auto-detect'}")
+    print(f"Min Confidence: {MIN_CONFIDENCE_FOR_ESP_ACTION}")
+    print(f"Template Threshold: {TEMPLATE_CONFIDENCE_THRESHOLD}")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    # Validate configuration when run directly
+    errors = validate_config()
+    if errors:
+        print("❌ Configuration errors found:")
+        for error in errors:
+            print(f"  - {error}")
+    else:
+        print("✅ Configuration is valid")
+        print_config_summary()
