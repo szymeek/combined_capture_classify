@@ -5,6 +5,8 @@ import os
 import pickle
 from typing import List, Tuple, Dict, Optional
 import random
+from config import TEMPLATES_PATH, CROP_SIZE
+
 
 # Simple neural network implementation without external ML libraries
 class SimpleCNN:

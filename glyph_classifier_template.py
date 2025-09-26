@@ -4,6 +4,12 @@ import numpy as np
 import os
 import pickle
 from typing import List, Tuple, Dict, Optional
+from config import (
+    TEMPLATES_PATH,
+    TEMPLATE_CONFIDENCE_THRESHOLD,
+    CROP_SIZE
+)
+
 
 class TemplateGlyphClassifier:
     def __init__(self, templates_path: str, rotations: Optional[List[int]] = None):

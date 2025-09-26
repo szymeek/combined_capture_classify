@@ -7,6 +7,12 @@ from glyph_classifier_cnn import CNNGlyphClassifier
 from typing import Tuple, Dict, Optional
 import csv
 from datetime import datetime
+from config import (
+    TEMPLATES_PATH, 
+    MIN_CONFIDENCE_FOR_ESP_ACTION,
+    TEMPLATE_CONFIDENCE_THRESHOLD
+)
+
 
 class HybridGlyphClassifier:
     def __init__(self, templates_path: str, confidence_threshold: float = 0.7):

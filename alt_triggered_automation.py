@@ -204,6 +204,7 @@ class AltTriggeredAutomation:
             path = self.save_dir / fname
             cv2.imwrite(str(path), cropped)
         else:
+            fname = "not_saved"
             path = f"pos{position}_temp"
 
         # Convert to PIL for classification

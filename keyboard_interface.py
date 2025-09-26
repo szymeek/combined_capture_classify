@@ -1,12 +1,16 @@
 """
-High-Level Keyboard Interface without randomized keypress
+High-Level Keyboard Interface using centralized config
 """
 
 from esp_serial import ESP32Serial
+from config import ESP32_PORT
+from typing import Optional
 
 class KeyboardInterface:
-    def __init__(self, esp_port: str = None):
-        self.esp32 = ESP32Serial(port=esp_port)
+    def __init__(self, esp_port: Optional[str] = None):
+        # Use centralized config if no specific port provided
+        port = esp_port or ESP32_PORT
+        self.esp32 = ESP32Serial(port=port)
         self.connected = False
 
     def initialize(self) -> bool:
