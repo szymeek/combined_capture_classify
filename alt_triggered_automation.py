@@ -1,4 +1,3 @@
-
 # alt_triggered_automation.py
 # -*- coding: utf-8 -*-
 
@@ -15,7 +14,7 @@ Workflow:
 Dependencies: mss, opencv-python, pynput, pywin32, Pillow, numpy, pyserial
 
 Usage:
-python alt_triggered_automation.py --templates-path templates --esp-port COM3 --esp-delay-range 50 150
+python alt_triggered_automation.py [--override-options]
 """
 
 from __future__ import annotations
@@ -36,38 +35,35 @@ from pynput import keyboard
 from main_glyph_classifier import HybridGlyphClassifier
 from window_finder import find_window, get_capture_bbox, ensure_foreground
 from keyboard_interface import KeyboardInterface
-from config import MIN_CONFIDENCE_FOR_ESP_ACTION
+import config
 import mss
 
 class AltTriggeredAutomation:
     def __init__(
         self,
-        title_contains: str,
-        save_dir: str,
-        templates_path: str,
+        title_contains: Optional[str] = None,
+        save_dir: Optional[str] = None,
+        templates_path: Optional[str] = None,
         esp_port: Optional[str] = None,
-        bring_foreground: bool = True,
-        confidence_threshold: float = 0.7,
-        esp_delay_range: Tuple[int, int] = (50, 200),  # Default 50-200ms random delay
+        bring_foreground: Optional[bool] = None,
+        confidence_threshold: Optional[float] = None,
+        esp_delay_range: Optional[Tuple[int, int]] = None,
     ) -> None:
-        self.title_contains = title_contains
-        self.save_dir = Path(save_dir)
+        # Use config values as defaults, allow overrides
+        self.title_contains = title_contains or config.WINDOW_TITLE
+        self.save_dir = Path(save_dir or config.SCREENSHOTS_DIR)
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize window finder
         self.info = find_window(title_contains=self.title_contains)
         if self.info is None:
             raise SystemExit(f"Window not found containing title: {self.title_contains}")
-        if bring_foreground:
+        if bring_foreground if bring_foreground is not None else config.BRING_WINDOW_TO_FOREGROUND:
             ensure_foreground(self.info.hwnd)
 
-        # Crop coordinates for the 3 sequential positions (26x26 crops)
-        self._crop_coords = {
-            1: (39, 943),   # First glyph position
-            2: (97, 943),   # Second glyph position  
-            3: (155, 943),  # Third glyph position
-        }
-        self._crop_size = 26
+        # Use config crop coordinates and size
+        self._crop_coords = config.CROP_COORDINATES.copy()
+        self._crop_size = config.CROP_SIZE
 
         self._lock = threading.Lock()
         self._total_processed = 0
@@ -75,14 +71,15 @@ class AltTriggeredAutomation:
         self._processing_sequence = False  # Flag to prevent overlapping sequences
 
         self._last_alt_press = 0.0
-        self._debounce_s = 0.5  # Longer debounce to prevent accidental double-triggers
+        self._debounce_s = config.ALT_DEBOUNCE_TIME
 
-        # Timing settings
-        self._initial_delay = 0.5    # Wait after Alt press for UI to appear
-        self._capture_delays = [0.0, 0.2, 0.2]  # Delays before each capture
+        # Timing settings from config
+        self._initial_delay = config.INITIAL_DELAY
+        self._capture_delays = config.CAPTURE_DELAYS.copy()
 
         # ESP random delay settings
-        self._esp_delay_min, self._esp_delay_max = esp_delay_range
+        esp_range = esp_delay_range or (config.ESP_DELAY_MIN, config.ESP_DELAY_MAX)
+        self._esp_delay_min, self._esp_delay_max = esp_range
         print(f"🎲 ESP random delay range: {self._esp_delay_min}-{self._esp_delay_max}ms")
 
         # Initialize random seed for ESP delays
@@ -90,11 +87,14 @@ class AltTriggeredAutomation:
 
         # Initialize hybrid glyph classifier
         print("🔍 Initializing hybrid glyph classifier...")
+        templates_path = templates_path or config.TEMPLATES_PATH
+        confidence_threshold = confidence_threshold or config.TEMPLATE_CONFIDENCE_THRESHOLD
         self.classifier = HybridGlyphClassifier(templates_path, confidence_threshold)
 
         # Initialize ESP32-S3 keyboard interface
         print("🎮 Initializing ESP32-S3 keyboard interface...")
-        self.keyboard = KeyboardInterface(esp_port if esp_port is not None else "")
+        esp_port = esp_port or config.ESP32_PORT
+        self.keyboard = KeyboardInterface(esp_port or "")
         if not self.keyboard.initialize():
             raise SystemExit("❌ Failed to initialize ESP32-S3 keyboard interface")
 
@@ -129,7 +129,7 @@ class AltTriggeredAutomation:
             return None
 
     def _crop_frame(self, frame: np.ndarray, position: int) -> Optional[np.ndarray]:
-        """Crop frame to 26x26 at specified position coordinates"""
+        """Crop frame to specified size at position coordinates from config"""
         if position not in self._crop_coords:
             return None
         x, y = self._crop_coords[position]
@@ -145,7 +145,7 @@ class AltTriggeredAutomation:
     def _process_classification(self, prediction: str, confidence: float, position: int) -> bool:
         """Process classification result and send appropriate ESP commands with random delay"""
 
-        if confidence < MIN_CONFIDENCE_FOR_ESP_ACTION:
+        if confidence < config.MIN_CONFIDENCE_FOR_ESP_ACTION:
             print(f"   🔍 Confidence too low ({confidence:.3f}) - no ESP action")
             return False
 
@@ -178,7 +178,7 @@ class AltTriggeredAutomation:
         """Capture, classify and send ESP command for a specific position"""
 
         # Apply position-specific delay
-        if self._capture_delays[position-1] > 0:
+        if position <= len(self._capture_delays) and self._capture_delays[position-1] > 0:
             time.sleep(self._capture_delays[position-1])
 
         # Capture screenshot
@@ -193,15 +193,18 @@ class AltTriggeredAutomation:
             print(f"   ❌ Failed to crop frame for position {position}")
             return False
 
-        # Save cropped image
-        ts = self._now_ms()
-        with self._lock:
-            self._total_processed += 1
-            total_idx = self._total_processed
+        # Save cropped image if enabled
+        if config.SAVE_CROPPED_IMAGES:
+            ts = self._now_ms()
+            with self._lock:
+                self._total_processed += 1
+                total_idx = self._total_processed
 
-        fname = f"pos{position}_alt_seq_{ts}_{total_idx:04d}.png"
-        path = self.save_dir / fname
-        cv2.imwrite(str(path), cropped)
+            fname = f"pos{position}_alt_seq_{ts}_{total_idx:04d}.png"
+            path = self.save_dir / fname
+            cv2.imwrite(str(path), cropped)
+        else:
+            path = f"pos{position}_temp"
 
         # Convert to PIL for classification
         pil_img = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY))
@@ -209,14 +212,16 @@ class AltTriggeredAutomation:
         # Classify the glyph
         prediction, confidence, details = self.classifier.classify(pil_img)
 
-        print(f"   📸 Position {position}: {prediction} (conf: {confidence:.3f}) -> {fname}")
+        print(f"   📸 Position {position}: {prediction} (conf: {confidence:.3f}) -> {fname if config.SAVE_CROPPED_IMAGES else 'not saved'}")
 
         # Send to ESP32-S3 if confident enough (with random delay)
         esp_sent = self._process_classification(prediction, confidence, position)
 
-        # Log to CSV
-        self.classifier.log_result(str(path), prediction, confidence, details, 
-                                 csv_path=str(self.save_dir / "results.csv"))
+        # Log to CSV if enabled
+        if config.LOG_TO_CSV:
+            csv_path = self.save_dir / config.RESULTS_CSV
+            self.classifier.log_result(str(path), prediction, confidence, details, 
+                                     csv_path=str(csv_path))
 
         return True
 
@@ -237,17 +242,16 @@ class AltTriggeredAutomation:
 
             # Process each position sequentially
             success_count = 0
-            esp_commands_sent = 0
+            positions = list(self._crop_coords.keys())
 
-            for position in [1, 2, 3]:
+            for position in positions:
                 print(f"   🎯 Processing position {position}...")
                 if self._capture_classify_and_send(position):
                     success_count += 1
-                    # Note: ESP command success is handled inside _process_classification
                 else:
                     print(f"   ⚠️ Position {position} processing failed")
 
-            print(f"✅ Sequence completed! ({success_count}/3 positions processed)")
+            print(f"✅ Sequence completed! ({success_count}/{len(positions)} positions processed)")
             print("🔄 Ready for next Alt press...")
 
         except Exception as e:
@@ -293,7 +297,7 @@ class AltTriggeredAutomation:
         print("=" * 70)
         print("📝 Workflow:")
         print("   1. Press Alt to trigger MTA UI")
-        print("   2. System captures & classifies 3 glyph positions")
+        print("   2. System captures & classifies glyph positions")
         print("   3. Random delay applied before each ESP command")
         print("   4. ESP32-S3 sends detected keys automatically")
         print("   5. Ready for next Alt press")
@@ -304,8 +308,9 @@ class AltTriggeredAutomation:
         print()
         print("📊 Settings:")
         print(f"   - Crop coordinates: {self._crop_coords}")
+        print(f"   - Crop size: {self._crop_size}x{self._crop_size}")
         print(f"   - ESP32-S3 port: {self.keyboard.esp32.port}")
-        print(f"   - Min confidence for ESP action: {MIN_CONFIDENCE_FOR_ESP_ACTION}")
+        print(f"   - Min confidence for ESP action: {config.MIN_CONFIDENCE_FOR_ESP_ACTION}")
         print(f"   - Initial delay: {self._initial_delay}s")
         print(f"   - Capture delays: {self._capture_delays}")
         print(f"   - ESP random delay range: {self._esp_delay_min}-{self._esp_delay_max}ms")
@@ -326,49 +331,62 @@ class AltTriggeredAutomation:
 
 
 def main():
+    # Print config summary first
+    if config.VERBOSE_LOGGING:
+        config.print_config_summary()
+        
+        # Validate config
+        errors = config.validate_config()
+        if errors:
+            print("❌ Configuration errors found:")
+            for error in errors:
+                print(f"  - {error}")
+            return
+
     ap = argparse.ArgumentParser(description="Alt-Triggered MTA ESP32-S3 Automation with Random Delays")
-    ap.add_argument("--title", default="MTA: San Andreas",
-                    help="Window title to capture from")
-    ap.add_argument("--save-dir", default="screenshots",
-                    help="Directory to save screenshots")
-    ap.add_argument("--templates-path", required=True,
-                    help="Path to templates folder containing 'q' and 'e' subdirectories")
+    ap.add_argument("--title", default=None,
+                    help=f"Window title to capture from (default: {config.WINDOW_TITLE})")
+    ap.add_argument("--save-dir", default=None,
+                    help=f"Directory to save screenshots (default: {config.SCREENSHOTS_DIR})")
+    ap.add_argument("--templates-path", default=None,
+                    help=f"Path to templates folder (default: {config.TEMPLATES_PATH})")
     ap.add_argument("--esp-port", default=None,
-                    help="ESP32-S3 COM port (auto-detect if not specified)")
+                    help="ESP32-S3 COM port (overrides config)")
     ap.add_argument("--no-foreground", action="store_true",
                     help="Don't bring MTA window to foreground")
-    ap.add_argument("--initial-delay", type=float, default=0.5,
-                    help="Delay after Alt press before first capture (seconds)")
-    ap.add_argument("--capture-delay", type=float, default=0.2,
-                    help="Delay between captures (seconds)")
-    ap.add_argument("--esp-delay-range", nargs=2, type=int, default=[50, 200], 
+    ap.add_argument("--initial-delay", type=float, default=None,
+                    help=f"Delay after Alt press (default: {config.INITIAL_DELAY}s)")
+    ap.add_argument("--capture-delay", type=float, default=None,
+                    help="Delay between captures (overrides config)")
+    ap.add_argument("--esp-delay-range", nargs=2, type=int, default=None, 
                     metavar=("MIN", "MAX"),
-                    help="Random delay range before ESP commands in milliseconds (default: 50 200)")
+                    help=f"Random delay range in ms (default: {config.ESP_DELAY_MIN} {config.ESP_DELAY_MAX})")
 
     args = ap.parse_args()
 
-    # Validate ESP delay range
-    if args.esp_delay_range[0] >= args.esp_delay_range[1]:
-        print("❌ Error: ESP delay minimum must be less than maximum")
-        return
-    if args.esp_delay_range[0] < 0:
-        print("❌ Error: ESP delay values must be non-negative")
-        return
+    # Validate ESP delay range if provided
+    if args.esp_delay_range:
+        if args.esp_delay_range[0] >= args.esp_delay_range[1]:
+            print("❌ Error: ESP delay minimum must be less than maximum")
+            return
+        if args.esp_delay_range[0] < 0:
+            print("❌ Error: ESP delay values must be non-negative")
+            return
 
     try:
         automation = AltTriggeredAutomation(
             title_contains=args.title,
             save_dir=args.save_dir,
-            bring_foreground=not args.no_foreground,
             templates_path=args.templates_path,
+            bring_foreground=not args.no_foreground if args.no_foreground else None,
             esp_port=args.esp_port,
-            esp_delay_range=tuple(args.esp_delay_range)
+            esp_delay_range=tuple(args.esp_delay_range) if args.esp_delay_range else None
         )
 
         # Apply custom timing if specified
-        if args.initial_delay != 0.5:
+        if args.initial_delay is not None:
             automation._initial_delay = args.initial_delay
-        if args.capture_delay != 0.2:
+        if args.capture_delay is not None:
             automation._capture_delays = [0.0, args.capture_delay, args.capture_delay]
 
         automation.run()
