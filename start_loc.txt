@@ -13,6 +13,14 @@ pozycja 1: x, y = 50, 901           # top-left corner
 pozycja 2: x, y = 125, 901           # top-left corner
 pozycja 3: x, y = 200, 901           # top-left corner
 
+starting pos
+Crop parameters
+x, y = 761, 72           # top-left corner
+w, h = 397, 16             # crop size
+box = (x, y, x + w, y + h)  # (left, upper, right, lower)
+761,72
+1158,88
+
 
 wymiary dla rozdzielczości 1600x900
 
@@ -27,3 +35,11 @@ wymiar wycinka 36x36
 pozycja 1: x, y = 49, 720           # top-left corner
 pozycja 2: x, y = 124, 720           # top-left corner
 pozycja 3: x, y = 199, 720           # top-left corner
+
+starting pos
+Crop parameters
+x, y = 634, 60           # top-left corner
+w, h = 331, 14             # crop size
+box = (x, y, x + w, y + h)  # (left, upper, right, lower)
+634,60
+965,74
