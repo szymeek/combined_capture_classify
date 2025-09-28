@@ -38,6 +38,9 @@ from keyboard_interface import KeyboardInterface
 import config
 import mss
 
+from telegram_message import send_message
+import asyncio
+
 class AltTriggeredAutomation:
     def __init__(
         self,
@@ -247,6 +250,7 @@ class AltTriggeredAutomation:
 
             for position in positions:
                 print(f"   🎯 Processing position {position}...")
+                asyncio.run(send_message(str(position)))
                 if self._capture_classify_and_send(position):
                     success_count += 1
                 else:

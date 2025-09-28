@@ -5,3 +5,4 @@ pynput
 pywin32
 mss
 pyserial
+python-telegram-bot
