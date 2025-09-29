@@ -250,7 +250,6 @@ class AltTriggeredAutomation:
 
             for position in positions:
                 print(f"   🎯 Processing position {position}...")
-                asyncio.run(send_message(str(position)))
                 if self._capture_classify_and_send(position):
                     success_count += 1
                 else:
