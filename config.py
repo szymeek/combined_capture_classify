@@ -44,7 +44,7 @@ CROP_SIZE = 26
 INITIAL_DELAY = 0.5
 
 # Delays before each capture [pos1, pos2, pos3] (seconds)
-CAPTURE_DELAYS = [0.0, 0.2, 0.2]
+CAPTURE_DELAYS = [0.0, 0.3, 0.3]
 
 # Debounce time between Alt presses (seconds)
 ALT_DEBOUNCE_TIME = 0.5
@@ -79,6 +79,32 @@ HIGH_CONFIDENCE_THRESHOLD = 0.8
 
 # Template matching confidence threshold
 TEMPLATE_CONFIDENCE_THRESHOLD = 0.7
+
+# ============================================================================
+# STATUS MONITORING (POST Q/E SEQUENCE)
+# ============================================================================
+
+# Status monitoring region crop coordinates and size
+STATUS_REGION_CROP = {
+    'x': 634,
+    'y': 60,
+    'width': 331,
+    'height': 14
+}
+
+# Status templates paths
+STATUS_TEMPLATES_ALT = "templates/alt"
+STATUS_TEMPLATES_WAIT = "templates/wait"
+
+# Status monitoring timing
+STATUS_CHECK_DELAY_MIN = 0.2  # seconds - minimum delay between checks
+STATUS_CHECK_DELAY_MAX = 0.3  # seconds - maximum delay between checks
+STATUS_INITIAL_WAIT = 2.5     # seconds - wait after last Q/E press before monitoring
+
+# Status monitoring thresholds and limits
+STATUS_CONFIDENCE_THRESHOLD = 0.8  # Higher threshold for status detection
+STATUS_MAX_RETRIES = 5             # Max retries before exiting on no match
+STATUS_MAX_ITERATIONS = 50         # Max loop iterations before forced exit
 
 # ============================================================================
 # WINDOW MANAGEMENT
@@ -129,13 +155,32 @@ def validate_config():
     # Validate confidence thresholds
     if not (0 <= MIN_CONFIDENCE_FOR_ESP_ACTION <= 1):
         errors.append("MIN_CONFIDENCE_FOR_ESP_ACTION must be between 0 and 1")
-    
+
     if not (0 <= HIGH_CONFIDENCE_THRESHOLD <= 1):
         errors.append("HIGH_CONFIDENCE_THRESHOLD must be between 0 and 1")
-    
+
     if not (0 <= TEMPLATE_CONFIDENCE_THRESHOLD <= 1):
         errors.append("TEMPLATE_CONFIDENCE_THRESHOLD must be between 0 and 1")
-    
+
+    if not (0 <= STATUS_CONFIDENCE_THRESHOLD <= 1):
+        errors.append("STATUS_CONFIDENCE_THRESHOLD must be between 0 and 1")
+
+    # Validate status monitoring settings
+    if STATUS_CHECK_DELAY_MIN >= STATUS_CHECK_DELAY_MAX:
+        errors.append("STATUS_CHECK_DELAY_MIN must be less than STATUS_CHECK_DELAY_MAX")
+
+    if STATUS_CHECK_DELAY_MIN < 0 or STATUS_CHECK_DELAY_MAX < 0:
+        errors.append("Status check delay values must be non-negative")
+
+    if STATUS_INITIAL_WAIT < 0:
+        errors.append("STATUS_INITIAL_WAIT must be non-negative")
+
+    if STATUS_MAX_RETRIES < 1:
+        errors.append("STATUS_MAX_RETRIES must be at least 1")
+
+    if STATUS_MAX_ITERATIONS < 1:
+        errors.append("STATUS_MAX_ITERATIONS must be at least 1")
+
     return errors
 
 # ============================================================================
@@ -163,9 +208,9 @@ if __name__ == "__main__":
     # Validate configuration when run directly
     errors = validate_config()
     if errors:
-        print("❌ Configuration errors found:")
+        print("Configuration errors found:")
         for error in errors:
             print(f"  - {error}")
     else:
-        print("✅ Configuration is valid")
+        print("Configuration is valid")
         print_config_summary()
