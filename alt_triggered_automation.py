@@ -32,7 +32,7 @@ import cv2
 
 from pynput import keyboard
 
-from main_glyph_classifier import HybridGlyphClassifier
+from main_glyph_classifier import GlyphClassifier
 from window_finder import find_window, get_capture_bbox, ensure_foreground
 from keyboard_interface import KeyboardInterface
 import config
@@ -92,11 +92,11 @@ class AltTriggeredAutomation:
         # Initialize random seed for ESP delays
         random.seed()
 
-        # Initialize hybrid glyph classifier
-        print("🔍 Initializing hybrid glyph classifier...")
+        # Initialize glyph classifier
+        print("🔍 Initializing template-based glyph classifier...")
         templates_path = templates_path or config.TEMPLATES_PATH
         confidence_threshold = confidence_threshold or config.TEMPLATE_CONFIDENCE_THRESHOLD
-        self.classifier = HybridGlyphClassifier(templates_path, confidence_threshold)
+        self.classifier = GlyphClassifier(templates_path, confidence_threshold)
 
         # Initialize ESP32-S3 keyboard interface
         print("🎮 Initializing ESP32-S3 keyboard interface...")
@@ -319,7 +319,7 @@ class AltTriggeredAutomation:
     def run(self) -> None:
         """Main automation loop"""
         print("=" * 70)
-        print("🎮 Alt-Triggered MTA ESP32-S3 Automation (with Random Delays)")
+        print("🎮 Alt-Triggered MTA ESP32-S3 Automation (Template Matching)")
         print("=" * 70)
         print("📝 Workflow:")
         print("   1. Press Alt to trigger MTA UI")

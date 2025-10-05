@@ -28,9 +28,9 @@ WINDOW_TITLE = "MTA: San Andreas"
 
 # Crop coordinates for the 3 sequential glyph positions (x, y)
 CROP_COORDINATES = {
-    1: (39, 943),   # First glyph position
-    2: (97, 943),   # Second glyph position  
-    3: (155, 943),  # Third glyph position
+    1: (38, 762),   # First glyph position
+    2: (96, 762),   # Second glyph position  
+    3: (154, 762),  # Third glyph position
 }
 
 # Size of each crop (width x height in pixels)
