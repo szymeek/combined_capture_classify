@@ -19,6 +19,8 @@ class TemplateGlyphClassifier:
         self.templates: Dict[str, List[np.ndarray]] = {"q": [], "e": []}
         self.rotations = rotations if rotations is not None else [0, -15, 15, -30, 30, -45, 45]
         self.templates_path = templates_path
+        # Cache for template statistics to avoid recomputation
+        self._template_stats: Dict[str, List[Tuple[np.ndarray, float, float]]] = {"q": [], "e": []}
         self.load_templates()
 
     def load_templates(self):
@@ -46,8 +48,16 @@ class TemplateGlyphClassifier:
                         
                         processed = self.preprocess_image(rotated)
                         self.templates[glyph].append(processed)
+
+                        # Pre-compute template statistics for faster correlation
+                        flat = processed.flatten()
+                        mean = np.mean(flat)
+                        centered = flat - mean
+                        norm = np.sqrt(np.dot(centered, centered))
+                        self._template_stats[glyph].append((centered, mean, norm))
+
                         template_count += 1
-            
+
             print(f"Loaded {template_count} templates for '{glyph}'")
 
     def preprocess_image(self, image: Image.Image) -> np.ndarray:
@@ -125,21 +135,40 @@ class TemplateGlyphClassifier:
         return dilated
 
     def normalized_cross_correlation(self, image: np.ndarray, template: np.ndarray) -> float:
-        """Calculate normalized cross correlation between image and template"""
+        """Calculate normalized cross correlation between image and template - optimized"""
         if image.shape != template.shape:
             return 0.0
-            
-        # Convert to mean-zero
-        image_mean = image - np.mean(image)
-        template_mean = template - np.mean(template)
-        
-        # Calculate correlation
-        numerator = np.sum(image_mean * template_mean)
-        denominator = np.sqrt(np.sum(image_mean ** 2) * np.sum(template_mean ** 2))
-        
+
+        # Vectorized operations for better performance
+        img_flat = image.flatten()
+        temp_flat = template.flatten()
+
+        # Pre-compute means
+        img_mean = np.mean(img_flat)
+        temp_mean = np.mean(temp_flat)
+
+        # Mean-zero arrays
+        img_centered = img_flat - img_mean
+        temp_centered = temp_flat - temp_mean
+
+        # Vectorized correlation calculation
+        numerator = np.dot(img_centered, temp_centered)
+        denominator = np.sqrt(np.dot(img_centered, img_centered) * np.dot(temp_centered, temp_centered))
+
         if denominator == 0:
             return 0.0
-        
+
+        return numerator / denominator
+
+    def fast_correlation(self, img_centered: np.ndarray, img_norm: float,
+                        temp_centered: np.ndarray, temp_norm: float) -> float:
+        """Fast correlation using pre-computed centered values and norms"""
+        if img_norm == 0 or temp_norm == 0:
+            return 0.0
+
+        numerator = np.dot(img_centered, temp_centered)
+        denominator = img_norm * temp_norm
+
         return numerator / denominator
 
     def classify(self, image: Image.Image) -> Tuple[str, float, Dict[str, float]]:
@@ -155,13 +184,19 @@ class TemplateGlyphClassifier:
             
         # Preprocess input image
         processed_image = self.preprocess_image(image)
-        
-        # Match against all templates
+
+        # Pre-compute image statistics once
+        img_flat = processed_image.flatten()
+        img_mean = np.mean(img_flat)
+        img_centered = img_flat - img_mean
+        img_norm = np.sqrt(np.dot(img_centered, img_centered))
+
+        # Match against all templates using optimized correlation
         scores: Dict[str, float] = {}
         for glyph in ["q", "e"]:
             max_correlation = 0.0
-            for template in self.templates[glyph]:
-                correlation = self.normalized_cross_correlation(processed_image, template)
+            for temp_centered, temp_mean, temp_norm in self._template_stats[glyph]:
+                correlation = self.fast_correlation(img_centered, img_norm, temp_centered, temp_norm)
                 max_correlation = max(max_correlation, correlation)
             scores[glyph] = max_correlation
         

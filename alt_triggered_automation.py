@@ -76,6 +76,10 @@ class AltTriggeredAutomation:
         self._last_alt_press = 0.0
         self._debounce_s = config.ALT_DEBOUNCE_TIME
 
+        # MSS instance - will be created per thread due to thread-local storage requirements
+        self._sct_lock = threading.Lock()
+        self._sct_instances = {}  # Thread ID -> mss instance mapping
+
         # Timing settings from config
         self._initial_delay = config.INITIAL_DELAY
         self._capture_delays = config.CAPTURE_DELAYS.copy()
@@ -107,26 +111,43 @@ class AltTriggeredAutomation:
         return int(time.time() * 1000)
 
     def _get_random_esp_delay(self) -> int:
-        """Generate random delay in milliseconds for ESP command"""
-        return random.randint(self._esp_delay_min, self._esp_delay_max)
+        """Generate random delay using normal distribution for more human-like timing"""
+        # Use normal distribution instead of uniform for more realistic human-like delays
+        mean = (self._esp_delay_min + self._esp_delay_max) / 2
+        std_dev = (self._esp_delay_max - self._esp_delay_min) / 6  # 99.7% within range
+
+        delay = int(random.gauss(mean, std_dev))
+        # Clamp to min/max range
+        return max(self._esp_delay_min, min(self._esp_delay_max, delay))
+
+    def _get_thread_mss(self) -> mss.mss:
+        """Get or create mss instance for current thread"""
+        thread_id = threading.get_ident()
+
+        with self._sct_lock:
+            if thread_id not in self._sct_instances:
+                self._sct_instances[thread_id] = mss.mss()
+
+        return self._sct_instances[thread_id]
 
     def _safe_grab(self) -> Optional[np.ndarray]:
-        """Capture screenshot of MTA window"""
+        """Capture screenshot of MTA window using thread-local mss instance"""
         try:
             if self.info is None:
                 print("⚠️ Window info is None, cannot capture screen.")
                 return None
             bbox = get_capture_bbox(self.info)
-            with mss.mss() as sct:
-                monitor = {
-                    "left": bbox[0],
-                    "top": bbox[1],
-                    "width": bbox[2],
-                    "height": bbox[3]
-                }
-                screenshot = sct.grab(monitor)
-                frame = np.asarray(screenshot, dtype=np.uint8)[..., :3]
-                return frame
+            monitor = {
+                "left": bbox[0],
+                "top": bbox[1],
+                "width": bbox[2],
+                "height": bbox[3]
+            }
+            # Get thread-local mss instance
+            sct = self._get_thread_mss()
+            screenshot = sct.grab(monitor)
+            frame = np.asarray(screenshot, dtype=np.uint8)[..., :3]
+            return frame
         except Exception as e:
             print(f"⚠️ Capture failed: {e}")
             return None
@@ -268,10 +289,11 @@ class AltTriggeredAutomation:
         """Handle Alt key press - trigger the full sequence"""
         now = time.perf_counter()
 
-        # Debounce check
-        if (now - self._last_alt_press) < self._debounce_s:
-            return
-        self._last_alt_press = now
+        # Debounce check with thread safety
+        with self._lock:
+            if (now - self._last_alt_press) < self._debounce_s:
+                return
+            self._last_alt_press = now
 
         print(f"\n🎮 Alt pressed! Triggering capture sequence...")
 
@@ -329,8 +351,18 @@ class AltTriggeredAutomation:
         except KeyboardInterrupt:
             print("\n🛑 Interrupted by user")
         finally:
-            # Clean up ESP connection
+            # Clean up resources
             self.keyboard.cleanup()
+
+            # Close all thread-local mss instances
+            with self._sct_lock:
+                for sct_instance in self._sct_instances.values():
+                    try:
+                        sct_instance.close()
+                    except:
+                        pass
+                self._sct_instances.clear()
+
             print("👋 Alt-triggered automation stopped")
 
 
