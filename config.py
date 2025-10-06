@@ -44,7 +44,7 @@ CROP_SIZE = 26
 INITIAL_DELAY = 0.5
 
 # Delays before each capture [pos1, pos2, pos3] (seconds)
-CAPTURE_DELAYS = [0.0, 0.3, 0.3]
+CAPTURE_DELAYS = [0.3, 0.4, 0.4]
 
 # Debounce time between Alt presses (seconds)
 ALT_DEBOUNCE_TIME = 0.5
@@ -92,7 +92,16 @@ STATUS_REGION_CROP = {
     'height': 14
 }
 
+# End detection region crop coordinates and size (checked first, before status)
+END_REGION_CROP = {
+    'x': 701,
+    'y': 27,
+    'width': 28,
+    'height': 10
+}
+
 # Status templates paths
+STATUS_TEMPLATES_END = "templates/end"
 STATUS_TEMPLATES_ALT = "templates/alt"
 STATUS_TEMPLATES_WAIT = "templates/wait"
 

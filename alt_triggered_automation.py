@@ -179,7 +179,21 @@ class AltTriggeredAutomation:
         height = config.STATUS_REGION_CROP['height']
 
         if (y + height > frame.shape[0]) or (x + width > frame.shape[1]):
-            print(f"⚠️ Status crop coordinates ({x}, {y}) + {width}x{height} exceed frame bounds {frame.shape}")
+            print(f" Status crop coordinates ({x}, {y}) + {width}x{height} exceed frame bounds {frame.shape}")
+            return None
+
+        cropped = frame[y:y+height, x:x+width]
+        return cropped
+
+    def _crop_end_region(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        """Crop frame to end region for end detection"""
+        x = config.END_REGION_CROP['x']
+        y = config.END_REGION_CROP['y']
+        width = config.END_REGION_CROP['width']
+        height = config.END_REGION_CROP['height']
+
+        if (y + height > frame.shape[0]) or (x + width > frame.shape[1]):
+            print(f" End crop coordinates ({x}, {y}) + {width}x{height} exceed frame bounds {frame.shape}")
             return None
 
         cropped = frame[y:y+height, x:x+width]
@@ -286,17 +300,34 @@ class AltTriggeredAutomation:
             # Capture screenshot
             frame = self._safe_grab()
             if frame is None:
-                print(f"   ⚠️ Failed to capture frame in status monitoring")
+                print(f"    Failed to capture frame in status monitoring")
                 no_match_count += 1
                 if no_match_count >= config.STATUS_MAX_RETRIES:
                     print(f"    Too many capture failures, exiting monitoring loop")
                     break
                 continue
 
-            # Crop to status region
+            # FIRST: Check for 'end' status (takes priority)
+            end_cropped = self._crop_end_region(frame)
+            if end_cropped is not None:
+                try:
+                    pil_end_img = Image.fromarray(cv2.cvtColor(end_cropped, cv2.COLOR_BGR2GRAY))
+                    end_prediction, end_confidence, end_details = self.status_classifier.classify(pil_end_img, region_type="end")
+
+                    iteration_count += 1
+                    print(f"    Iteration {iteration_count}: Checking END - {end_prediction} (conf: {end_confidence:.3f})")
+
+                    if end_prediction == "end" and end_confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
+                        print(f"    END detected! Exiting to idle state...")
+                        break  # Exit monitoring loop, return to idle
+
+                except Exception as e:
+                    print(f"    End classification error: {e}")
+
+            # SECOND: Check for 'alt' or 'wait' status
             cropped = self._crop_status_region(frame)
             if cropped is None:
-                print(f"   ⚠️ Failed to crop status region")
+                print(f"    Failed to crop status region")
                 no_match_count += 1
                 if no_match_count >= config.STATUS_MAX_RETRIES:
                     print(f"    Too many crop failures, exiting monitoring loop")
@@ -308,10 +339,9 @@ class AltTriggeredAutomation:
 
             # Classify status region
             try:
-                prediction, confidence, details = self.status_classifier.classify(pil_img)
-                iteration_count += 1
+                prediction, confidence, details = self.status_classifier.classify(pil_img, region_type="status")
 
-                print(f"    Iteration {iteration_count}: {prediction} (conf: {confidence:.3f})")
+                print(f"    Status check: {prediction} (conf: {confidence:.3f})")
 
                 # Check if confident match
                 if confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
@@ -319,7 +349,7 @@ class AltTriggeredAutomation:
 
                     if prediction == "wait":
                         # Keep waiting
-                        print(f"   ⏳ Status: WAIT - continuing monitoring...")
+                        print(f"    Status: WAIT - continuing monitoring...")
                         continue
 
                     elif prediction == "alt":
@@ -343,7 +373,7 @@ class AltTriggeredAutomation:
                 else:
                     # Low confidence - no clear match
                     no_match_count += 1
-                    print(f"   ⚠️ Low confidence ({confidence:.3f}) - no match count: {no_match_count}/{config.STATUS_MAX_RETRIES}")
+                    print(f"    Low confidence ({confidence:.3f}) - no match count: {no_match_count}/{config.STATUS_MAX_RETRIES}")
 
                     if no_match_count >= config.STATUS_MAX_RETRIES:
                         print(f"    Max retries reached, exiting monitoring loop")
@@ -444,11 +474,12 @@ class AltTriggeredAutomation:
         print("   1. Press Alt to trigger MTA UI (human or auto)")
         print("   2. System captures & classifies Q/E glyph positions")
         print("   3. Random delay applied before each ESP command")
-        print("   4. After 3rd Q/E press: Wait 2.5s → Status monitoring")
-        print("   5. Monitor status region every 0.2-0.3s:")
-        print("      - 'wait' detected → Keep monitoring")
-        print("      - 'alt' detected → Auto-trigger Alt → Repeat from step 2")
-        print("      - No match (5 retries) → Return to idle")
+        print("   4. After 3rd Q/E press: Wait 2.5s -> Status monitoring")
+        print("   5. Monitor status every 0.2-0.3s (priority order):")
+        print("      - 'end' (701,27 28x10) -> Exit to idle")
+        print("      - 'wait' (634,60 331x14) -> Keep monitoring")
+        print("      - 'alt' (634,60 331x14) -> Auto-trigger Alt -> Repeat from step 2")
+        print("      - No match (5 retries) -> Return to idle")
         print("   6. Max 50 iterations before forced exit to idle")
         print()
         print("⌨️ Controls:")
@@ -463,7 +494,9 @@ class AltTriggeredAutomation:
         print(f"   - Capture delays: {self._capture_delays}")
         print()
         print(" Status Monitoring Settings:")
-        print(f"   - Status region: ({config.STATUS_REGION_CROP['x']}, {config.STATUS_REGION_CROP['y']}) "
+        print(f"   - End region: ({config.END_REGION_CROP['x']}, {config.END_REGION_CROP['y']}) "
+              f"{config.END_REGION_CROP['width']}x{config.END_REGION_CROP['height']}")
+        print(f"   - Alt/Wait region: ({config.STATUS_REGION_CROP['x']}, {config.STATUS_REGION_CROP['y']}) "
               f"{config.STATUS_REGION_CROP['width']}x{config.STATUS_REGION_CROP['height']}")
         print(f"   - Check interval: {config.STATUS_CHECK_DELAY_MIN}-{config.STATUS_CHECK_DELAY_MAX}s")
         print(f"   - Initial wait: {config.STATUS_INITIAL_WAIT}s")

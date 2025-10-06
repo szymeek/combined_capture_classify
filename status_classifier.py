@@ -1,47 +1,56 @@
-# status_classifier.py - Status template classifier for alt/wait detection
+# status_classifier.py - Status template classifier for end/alt/wait detection
 from PIL import Image
 import os
 import numpy as np
 from typing import Tuple, Dict, Optional
 from glyph_classifier_template import TemplateGlyphClassifier
 from config import (
+    STATUS_TEMPLATES_END,
     STATUS_TEMPLATES_ALT,
     STATUS_TEMPLATES_WAIT,
     STATUS_CONFIDENCE_THRESHOLD,
-    STATUS_REGION_CROP
+    STATUS_REGION_CROP,
+    END_REGION_CROP
 )
 
 
 class StatusClassifier:
-    def __init__(self, alt_templates_path: Optional[str] = None,
+    def __init__(self, end_templates_path: Optional[str] = None,
+                 alt_templates_path: Optional[str] = None,
                  wait_templates_path: Optional[str] = None,
                  confidence_threshold: Optional[float] = None):
         """
-        Initialize status classifier for alt/wait detection
+        Initialize status classifier for end/alt/wait detection
 
         Args:
+            end_templates_path: Path to 'end' templates folder
             alt_templates_path: Path to 'alt' templates folder
             wait_templates_path: Path to 'wait' templates folder
             confidence_threshold: Minimum confidence for classification
         """
+        self.end_path = end_templates_path or STATUS_TEMPLATES_END
         self.alt_path = alt_templates_path or STATUS_TEMPLATES_ALT
         self.wait_path = wait_templates_path or STATUS_TEMPLATES_WAIT
         self.confidence_threshold = confidence_threshold or STATUS_CONFIDENCE_THRESHOLD
 
         # Create a temporary structure for the template classifier
         # The TemplateGlyphClassifier expects folders named by class
-        self.class_names = ['alt', 'wait']
+        self.class_names = ['end', 'alt', 'wait']
 
         # We'll use the base TemplateGlyphClassifier with custom template loading
         self._load_templates()
 
     def _load_templates(self):
-        """Load alt and wait templates"""
+        """Load end, alt and wait templates"""
         print(f"Loading status templates...")
+        print(f"  End templates: {self.end_path}")
         print(f"  Alt templates: {self.alt_path}")
         print(f"  Wait templates: {self.wait_path}")
 
         # Verify paths exist
+        if not os.path.exists(self.end_path):
+            raise FileNotFoundError(f"End templates directory not found: {self.end_path}")
+
         if not os.path.exists(self.alt_path):
             raise FileNotFoundError(f"Alt templates directory not found: {self.alt_path}")
 
@@ -66,16 +75,24 @@ class StatusClassifier:
             print(f"❌ Failed to load status templates: {e}")
             raise
 
-    def classify(self, image: Image.Image) -> Tuple[str, float, Dict]:
+    def classify(self, image: Image.Image, region_type: str = "status") -> Tuple[str, float, Dict]:
         """
-        Classify status image as 'alt', 'wait', or neither
+        Classify status image as 'end', 'alt', 'wait', or neither
+
+        Args:
+            image: Input image to classify
+            region_type: "end" for end region (28x10), "status" for alt/wait region (331x14)
 
         Returns:
             (prediction, confidence, details)
         """
-        # Ensure proper image format
-        expected_height = STATUS_REGION_CROP['height']
-        expected_width = STATUS_REGION_CROP['width']
+        # Ensure proper image format based on region type
+        if region_type == "end":
+            expected_height = END_REGION_CROP['height']
+            expected_width = END_REGION_CROP['width']
+        else:
+            expected_height = STATUS_REGION_CROP['height']
+            expected_width = STATUS_REGION_CROP['width']
 
         if image.size != (expected_width, expected_height):
             image = image.resize((expected_width, expected_height), Image.Resampling.LANCZOS)
@@ -84,42 +101,43 @@ class StatusClassifier:
             image = image.convert('L')
 
         # Use template classifier
-        prediction, confidence, scores = self.template_classifier.classify(image)
+        prediction, confidence, scores = self.template_classifier.classify(image, region_type=region_type)
 
         details = {
             'prediction': prediction,
             'confidence': confidence,
             'scores': scores,
             'threshold': self.confidence_threshold,
-            'method_used': 'status_template_matching'
+            'method_used': 'status_template_matching',
+            'region_type': region_type
         }
 
         return prediction, confidence, details
 
-    def classify_from_crop(self, cropped_image: Image.Image) -> Tuple[str, float, Dict]:
-        """Classify from already cropped status region"""
-        return self.classify(cropped_image)
+    def classify_from_crop(self, cropped_image: Image.Image, region_type: str = "status") -> Tuple[str, float, Dict]:
+        """Classify from already cropped region"""
+        return self.classify(cropped_image, region_type=region_type)
 
 
 class StatusTemplateClassifier(TemplateGlyphClassifier):
     """
-    Custom template classifier for status detection (alt/wait)
-    Extends the base TemplateGlyphClassifier to use 'alt' and 'wait' instead of 'q' and 'e'
+    Custom template classifier for status detection (end/alt/wait)
+    Extends the base TemplateGlyphClassifier to use 'end', 'alt' and 'wait' instead of 'q' and 'e'
     """
 
     def __init__(self, templates_path: str, rotations: Optional[list] = None):
-        """Initialize with alt/wait templates"""
+        """Initialize with end/alt/wait templates"""
         # Override class names
-        self.templates = {"alt": [], "wait": []}
+        self.templates = {"end": [], "alt": [], "wait": []}
         self.rotations = rotations if rotations is not None else [0, -15, 15, -30, 30, -45, 45]
         self.templates_path = templates_path
-        self._template_stats = {"alt": [], "wait": []}
+        self._template_stats = {"end": [], "alt": [], "wait": []}
         self.load_templates()
 
     def load_templates(self):
-        """Load and preprocess alt/wait template images with rotations"""
+        """Load and preprocess end/alt/wait template images with rotations"""
         print("Loading status templates...")
-        for status in ["alt", "wait"]:
+        for status in ["end", "alt", "wait"]:
             status_path = os.path.join(self.templates_path, status)
             if not os.path.exists(status_path):
                 raise FileNotFoundError(f"Status template directory not found: {status_path}")
@@ -130,9 +148,12 @@ class StatusTemplateClassifier(TemplateGlyphClassifier):
                     img_path = os.path.join(status_path, filename)
                     img = Image.open(img_path).convert('L')
 
-                    # Resize to status region size (331x14)
-                    from config import STATUS_REGION_CROP
-                    target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
+                    # Resize to appropriate region size based on status type
+                    from config import STATUS_REGION_CROP, END_REGION_CROP
+                    if status == "end":
+                        target_size = (END_REGION_CROP['width'], END_REGION_CROP['height'])
+                    else:
+                        target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
                     img = img.resize(target_size, Image.Resampling.LANCZOS)
 
                     # Add original and rotated versions
@@ -157,16 +178,25 @@ class StatusTemplateClassifier(TemplateGlyphClassifier):
 
             print(f"Loaded {template_count} templates for '{status}'")
 
-    def classify(self, image: Image.Image) -> Tuple[str, float, Dict[str, float]]:
+    def classify(self, image: Image.Image, region_type: str = "status") -> Tuple[str, float, Dict[str, float]]:
         """
         Classify a status region image
+        Args:
+            image: Input image to classify
+            region_type: "end" for end region (28x10), "status" for alt/wait region (331x14)
         Returns: (predicted_class, confidence, all_scores)
         """
         import numpy as np
-        from config import STATUS_REGION_CROP
+        from config import STATUS_REGION_CROP, END_REGION_CROP
 
-        # Ensure proper size and format
-        target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
+        # Ensure proper size and format based on region type
+        if region_type == "end":
+            target_size = (END_REGION_CROP['width'], END_REGION_CROP['height'])
+            status_list = ["end"]
+        else:
+            target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
+            status_list = ["alt", "wait"]
+
         if image.size != target_size:
             image = image.resize(target_size, Image.Resampling.LANCZOS)
         if image.mode != 'L':
@@ -183,7 +213,7 @@ class StatusTemplateClassifier(TemplateGlyphClassifier):
 
         # Match against all templates using optimized correlation
         scores: Dict[str, float] = {}
-        for status in ["alt", "wait"]:
+        for status in status_list:
             max_correlation = 0.0
             for temp_centered, temp_mean, temp_norm in self._template_stats[status]:
                 correlation = self.fast_correlation(img_centered, img_norm, temp_centered, temp_norm)
