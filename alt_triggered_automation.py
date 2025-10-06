@@ -73,6 +73,7 @@ class AltTriggeredAutomation:
         self._total_processed = 0
         self._running = True
         self._processing_sequence = False  # Flag to prevent overlapping sequences
+        self._stop_monitoring = False  # Flag to immediately stop monitoring loop (S key pressed)
 
         self._last_alt_press = 0.0
         self._debounce_s = config.ALT_DEBOUNCE_TIME
@@ -292,7 +293,7 @@ class AltTriggeredAutomation:
         no_match_count = 0
         iteration_count = 0
 
-        while iteration_count < config.STATUS_MAX_ITERATIONS and self._running:
+        while iteration_count < config.STATUS_MAX_ITERATIONS and self._running and not self._stop_monitoring:
             # Random delay between checks
             delay = random.uniform(config.STATUS_CHECK_DELAY_MIN, config.STATUS_CHECK_DELAY_MAX)
             time.sleep(delay)
@@ -319,6 +320,15 @@ class AltTriggeredAutomation:
 
                     if end_prediction == "end" and end_confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
                         print(f"    END detected! Exiting to idle state...")
+
+                        # Send telegram message
+                        try:
+                            message = f"END detected! Confidence: {end_confidence:.3f}\nExiting to idle state."
+                            asyncio.run(send_message(message))
+                            print(f"    Telegram message sent: END detected")
+                        except Exception as telegram_error:
+                            print(f"    Failed to send Telegram message: {telegram_error}")
+
                         break  # Exit monitoring loop, return to idle
 
                 except Exception as e:
@@ -388,7 +398,12 @@ class AltTriggeredAutomation:
 
         # Exit monitoring loop
         if iteration_count >= config.STATUS_MAX_ITERATIONS:
-            print(f"   ⚠️ Max iterations ({config.STATUS_MAX_ITERATIONS}) reached, exiting monitoring")
+            print(f"    Max iterations ({config.STATUS_MAX_ITERATIONS}) reached, exiting monitoring")
+
+        with self._lock:
+            if self._stop_monitoring:
+                print(f"    Monitoring stopped by S key")
+                self._stop_monitoring = False  # Reset flag
 
         print(f"    Returning to idle state - waiting for human Alt press...")
 
@@ -417,9 +432,11 @@ class AltTriggeredAutomation:
         """Execute the full 3-position capture sequence followed by status monitoring"""
         with self._lock:
             if self._processing_sequence:
-                print("⚠️ Sequence already in progress, ignoring Alt press")
+                print(" Sequence already in progress, ignoring Alt press")
                 return
             self._processing_sequence = True
+            # Reset stop monitoring flag for new sequence
+            self._stop_monitoring = False
 
         try:
             # Execute Q/E sequence
@@ -453,9 +470,15 @@ class AltTriggeredAutomation:
     def on_press(self, key) -> None:
         """Handle key press events"""
         try:
-            # Only listen for Alt and ESC keys
+            # Listen for Alt, S, and ESC keys
             if key in (keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt):
                 self._handle_alt_press()
+            elif hasattr(key, 'char') and key.char and key.char.lower() == 's':
+                # S key pressed - immediately stop monitoring and return to idle
+                print("\n S key pressed - stopping monitoring and returning to idle...")
+                with self._lock:
+                    self._stop_monitoring = True
+                print(" Ready for next Alt press...")
             elif key == keyboard.Key.esc:
                 print("\n ESC detected; exiting Alt-triggered automation...")
                 self._running = False
@@ -476,14 +499,15 @@ class AltTriggeredAutomation:
         print("   3. Random delay applied before each ESP command")
         print("   4. After 3rd Q/E press: Wait 2.5s -> Status monitoring")
         print("   5. Monitor status every 0.2-0.3s (priority order):")
-        print("      - 'end' (701,27 28x10) -> Exit to idle")
+        print("      - 'end' (701,27 28x10) -> Send Telegram + Exit to idle")
         print("      - 'wait' (634,60 331x14) -> Keep monitoring")
         print("      - 'alt' (634,60 331x14) -> Auto-trigger Alt -> Repeat from step 2")
         print("      - No match (5 retries) -> Return to idle")
         print("   6. Max 50 iterations before forced exit to idle")
         print()
-        print("⌨️ Controls:")
+        print(" Controls:")
         print("   - Alt: Trigger capture sequence")
+        print("   - S: IMMEDIATELY stop and return to idle (await Alt)")
         print("   - ESC: Exit the program")
         print()
         print(" Q/E Settings:")
