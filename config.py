@@ -28,9 +28,9 @@ WINDOW_TITLE = "MTA: San Andreas"
 
 # Crop coordinates for the 3 sequential glyph positions (x, y)
 CROP_COORDINATES = {
-    1: (38, 762),   # First glyph position
-    2: (96, 762),   # Second glyph position  
-    3: (154, 762),  # Third glyph position
+    1: (39, 943),   # First glyph position
+    2: (97, 943),   # Second glyph position  
+    3: (155, 943),  # Third glyph position
 }
 
 # Size of each crop (width x height in pixels)
@@ -86,18 +86,18 @@ TEMPLATE_CONFIDENCE_THRESHOLD = 0.7
 
 # Status monitoring region crop coordinates and size
 STATUS_REGION_CROP = {
-    'x': 634,
-    'y': 60,
-    'width': 331,
-    'height': 14
+    'x': 761,
+    'y': 72,
+    'width': 397,
+    'height': 16
 }
 
 # End detection region crop coordinates and size (checked first, before status)
 END_REGION_CROP = {
-    'x': 701,
-    'y': 27,
-    'width': 28,
-    'height': 10
+    'x': 842,
+    'y': 33,
+    'width': 33,
+    'height': 11
 }
 
 # Status templates paths
@@ -106,13 +106,13 @@ STATUS_TEMPLATES_ALT = "templates/alt"
 STATUS_TEMPLATES_WAIT = "templates/wait"
 
 # Status monitoring timing
-STATUS_CHECK_DELAY_MIN = 0.2  # seconds - minimum delay between checks
-STATUS_CHECK_DELAY_MAX = 0.3  # seconds - maximum delay between checks
-STATUS_INITIAL_WAIT = 2.5     # seconds - wait after last Q/E press before monitoring
+STATUS_CHECK_DELAY_MIN = 2.3  # seconds - minimum delay between checks
+STATUS_CHECK_DELAY_MAX = 4.4  # seconds - maximum delay between checks
+STATUS_INITIAL_WAIT = 0.2     # seconds - wait after last Q/E press before monitoring
 
 # Status monitoring thresholds and limits
 STATUS_CONFIDENCE_THRESHOLD = 0.8  # Higher threshold for status detection
-STATUS_MAX_RETRIES = 5             # Max retries before exiting on no match
+STATUS_MAX_RETRIES = 10             # Max retries before exiting on no match
 STATUS_MAX_ITERATIONS = 50         # Max loop iterations before forced exit
 
 # ============================================================================
