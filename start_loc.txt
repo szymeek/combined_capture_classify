@@ -21,6 +21,10 @@ box = (x, y, x + w, y + h)  # (left, upper, right, lower)
 761,72
 1158,88
 
+end pos
+842, 33
+15, 11
+
 
 wymiary dla rozdzielczości 1600x900
 

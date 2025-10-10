@@ -20,18 +20,80 @@ SCREENSHOTS_DIR = "screenshots"
 RESULTS_CSV = "results.csv"
 
 # ============================================================================
+# RESOLUTION SETTINGS
+# ============================================================================
+
+# Active resolution - Change this to switch between resolutions
+# Options: "1920x1080" or "1600x900"
+ACTIVE_RESOLUTION = "1920x1080"
+
+# Resolution-specific coordinate configurations
+RESOLUTION_CONFIGS = {
+    "1920x1080": {
+        # Crop coordinates for the 3 sequential glyph positions (x, y)
+        "CROP_COORDINATES": {
+            1: (39, 943),   # First glyph position
+            2: (97, 943),   # Second glyph position
+            3: (155, 943),  # Third glyph position
+        },
+        # Status monitoring region crop coordinates and size
+        "STATUS_REGION_CROP": {
+            'x': 761,
+            'y': 72,
+            'width': 397,
+            'height': 16
+        },
+        # End detection region crop coordinates and size
+        "END_REGION_CROP": {
+            'x': 842,
+            'y': 33,
+            'width': 15,
+            'height': 11
+        },
+    },
+    "1600x900": {
+        # Crop coordinates for the 3 sequential glyph positions (x, y)
+        # TODO: Update these coordinates for 1600x900 resolution
+        "CROP_COORDINATES": {
+            1: (38, 762),   # First glyph position (scaled from 1920x1080)
+            2: (96, 762),   # Second glyph position
+            3: (154, 762),  # Third glyph position
+        },
+        # Status monitoring region crop coordinates and size
+        # TODO: Update these coordinates for 1600x900 resolution
+        "STATUS_REGION_CROP": {
+            'x': 634,
+            'y': 60,
+            'width': 331,
+            'height': 14
+        },
+        # End detection region crop coordinates and size
+        # TODO: Update these coordinates for 1600x900 resolution
+        "END_REGION_CROP": {
+            'x': 702,
+            'y': 28,
+            'width': 13,
+            'height': 9
+        },
+    }
+}
+
+# Get active resolution configuration
+_active_config = RESOLUTION_CONFIGS.get(ACTIVE_RESOLUTION)
+if _active_config is None:
+    raise ValueError(f"Invalid ACTIVE_RESOLUTION: {ACTIVE_RESOLUTION}. Must be one of {list(RESOLUTION_CONFIGS.keys())}")
+
+# Set current coordinates based on active resolution
+CROP_COORDINATES = _active_config["CROP_COORDINATES"]
+STATUS_REGION_CROP = _active_config["STATUS_REGION_CROP"]
+END_REGION_CROP = _active_config["END_REGION_CROP"]
+
+# ============================================================================
 # SCREEN CAPTURE SETTINGS
 # ============================================================================
 
 # Target window title to capture from
 WINDOW_TITLE = "MTA: San Andreas"
-
-# Crop coordinates for the 3 sequential glyph positions (x, y)
-CROP_COORDINATES = {
-    1: (39, 943),   # First glyph position
-    2: (97, 943),   # Second glyph position  
-    3: (155, 943),  # Third glyph position
-}
 
 # Size of each crop (width x height in pixels)
 CROP_SIZE = 26
@@ -89,22 +151,7 @@ TEMPLATE_CONFIDENCE_THRESHOLD = 0.7
 # STATUS MONITORING (POST Q/E SEQUENCE)
 # ============================================================================
 
-# Status monitoring region crop coordinates and size
-STATUS_REGION_CROP = {
-    'x': 761,
-    'y': 72,
-    'width': 397,
-    'height': 16
-}
-
-# End detection region crop coordinates and size (checked first, before status)
-# 1920x1080 857, 44
-END_REGION_CROP = {
-    'x': 842,
-    'y': 33,
-    'width': 15,
-    'height': 11
-}
+# Note: STATUS_REGION_CROP and END_REGION_CROP are now defined in RESOLUTION SETTINGS above
 
 # Status templates paths
 STATUS_TEMPLATES_END = "templates/end"
@@ -215,10 +262,13 @@ def print_config_summary():
     print("=" * 60)
     print("CONFIGURATION SUMMARY")
     print("=" * 60)
+    print(f"Active Resolution: {ACTIVE_RESOLUTION}")
     print(f"Templates Path: {TEMPLATES_PATH}")
     print(f"Window Title: {WINDOW_TITLE}")
     print(f"Crop Size: {CROP_SIZE}x{CROP_SIZE}")
     print(f"Crop Coordinates: {CROP_COORDINATES}")
+    print(f"Status Region: {STATUS_REGION_CROP}")
+    print(f"End Region: {END_REGION_CROP}")
     print(f"Initial Delay: {INITIAL_DELAY}s")
     print(f"Capture Delays: {CAPTURE_DELAYS}")
     print(f"ESP Delay Range: {ESP_DELAY_MIN}-{ESP_DELAY_MAX}ms")
