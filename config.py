@@ -165,7 +165,7 @@ STATUS_INITIAL_WAIT = 0.2     # seconds - wait after last Q/E press before monit
 
 # Status monitoring thresholds and limits
 STATUS_CONFIDENCE_THRESHOLD = 0.8  # Higher threshold for status detection
-STATUS_MAX_RETRIES = 10             # Max retries before exiting on no match
+STATUS_MAX_RETRIES = 5             # Max retries before exiting on no match
 STATUS_MAX_ITERATIONS = 50         # Max loop iterations before forced exit
 
 # ============================================================================
