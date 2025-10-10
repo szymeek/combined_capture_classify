@@ -292,6 +292,7 @@ class AltTriggeredAutomation:
 
         no_match_count = 0
         iteration_count = 0
+        exit_reason = ""  # Track why we're exiting
 
         while iteration_count < config.STATUS_MAX_ITERATIONS and self._running and not self._stop_monitoring:
             # Random delay between checks
@@ -305,6 +306,7 @@ class AltTriggeredAutomation:
                 no_match_count += 1
                 if no_match_count >= config.STATUS_MAX_RETRIES:
                     print(f"    Too many capture failures, exiting monitoring loop")
+                    exit_reason = f"Too many capture failures ({config.STATUS_MAX_RETRIES} retries)"
                     break
                 continue
 
@@ -341,6 +343,7 @@ class AltTriggeredAutomation:
                 no_match_count += 1
                 if no_match_count >= config.STATUS_MAX_RETRIES:
                     print(f"    Too many crop failures, exiting monitoring loop")
+                    exit_reason = f"Too many crop failures ({config.STATUS_MAX_RETRIES} retries)"
                     break
                 continue
 
@@ -387,6 +390,7 @@ class AltTriggeredAutomation:
 
                     if no_match_count >= config.STATUS_MAX_RETRIES:
                         print(f"    Max retries reached, exiting monitoring loop")
+                        exit_reason = f"Max retries reached - low confidence matches ({config.STATUS_MAX_RETRIES} retries)"
                         break
 
             except Exception as e:
@@ -394,16 +398,28 @@ class AltTriggeredAutomation:
                 no_match_count += 1
                 if no_match_count >= config.STATUS_MAX_RETRIES:
                     print(f"    Too many errors, exiting monitoring loop")
+                    exit_reason = f"Too many classification errors ({config.STATUS_MAX_RETRIES} retries)"
                     break
 
-        # Exit monitoring loop
-        if iteration_count >= config.STATUS_MAX_ITERATIONS:
+        # Exit monitoring loop - set reason if not already set
+        if not exit_reason and iteration_count >= config.STATUS_MAX_ITERATIONS:
             print(f"    Max iterations ({config.STATUS_MAX_ITERATIONS}) reached, exiting monitoring")
+            exit_reason = f"Max iterations ({config.STATUS_MAX_ITERATIONS}) reached"
 
         with self._lock:
             if self._stop_monitoring:
                 print(f"    Monitoring stopped by S key")
+                exit_reason = "Monitoring stopped by S key"
                 self._stop_monitoring = False  # Reset flag
+
+        # Send telegram message when returning to idle state (except for S key stop)
+        if exit_reason and exit_reason != "Monitoring stopped by S key":
+            try:
+                message = f"Returning to IDLE state.\nReason: {exit_reason}"
+                asyncio.run(send_message(message))
+                print(f"    Telegram message sent: Returning to idle")
+            except Exception as telegram_error:
+                print(f"    Failed to send Telegram message: {telegram_error}")
 
         print(f"    Returning to idle state - waiting for human Alt press...")
 

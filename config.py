@@ -41,7 +41,7 @@ CROP_SIZE = 26
 # ============================================================================
 
 # Delay after Alt press before first capture (seconds)
-INITIAL_DELAY = 0.5
+INITIAL_DELAY = 0.4
 
 # Delays before each capture [pos1, pos2, pos3] (seconds)
 CAPTURE_DELAYS = [0.3, 0.4, 0.4]
@@ -96,7 +96,7 @@ STATUS_REGION_CROP = {
 END_REGION_CROP = {
     'x': 842,
     'y': 33,
-    'width': 33,
+    'width': 15,
     'height': 11
 }
 
@@ -130,7 +130,7 @@ BRING_WINDOW_TO_FOREGROUND = True
 VERBOSE_LOGGING = True
 
 # Save cropped images for debugging
-SAVE_CROPPED_IMAGES = True
+SAVE_CROPPED_IMAGES = False
 
 # Log classification details to CSV
 LOG_TO_CSV = True
