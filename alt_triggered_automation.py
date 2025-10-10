@@ -84,7 +84,7 @@ class AltTriggeredAutomation:
 
         # Timing settings from config
         self._initial_delay = config.INITIAL_DELAY
-        self._capture_delays = config.CAPTURE_DELAYS.copy()
+        self._capture_delays = config.CAPTURE_DELAYS.copy()  # List of (min, max) tuples
 
         # ESP random delay settings
         esp_range = esp_delay_range or (config.ESP_DELAY_MIN, config.ESP_DELAY_MAX)
@@ -235,9 +235,12 @@ class AltTriggeredAutomation:
     def _capture_classify_and_send(self, position: int) -> bool:
         """Capture, classify and send ESP command for a specific position"""
 
-        # Apply position-specific delay
-        if position <= len(self._capture_delays) and self._capture_delays[position-1] > 0:
-            time.sleep(self._capture_delays[position-1])
+        # Apply position-specific random delay from range
+        if position <= len(self._capture_delays):
+            delay_min, delay_max = self._capture_delays[position-1]
+            random_delay = random.uniform(delay_min, delay_max)
+            print(f"    Capture delay for position {position}: {random_delay:.3f}s")
+            time.sleep(random_delay)
 
         # Capture screenshot
         frame = self._safe_grab()
@@ -630,7 +633,8 @@ def main():
         if args.initial_delay is not None:
             automation._initial_delay = args.initial_delay
         if args.capture_delay is not None:
-            automation._capture_delays = [0.0, args.capture_delay, args.capture_delay]
+            # If capture_delay is specified, use it as fixed delay (min=max)
+            automation._capture_delays = [(0.0, 0.0), (args.capture_delay, args.capture_delay), (args.capture_delay, args.capture_delay)]
 
         automation.run()
 

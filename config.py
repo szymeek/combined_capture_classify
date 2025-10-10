@@ -43,8 +43,13 @@ CROP_SIZE = 26
 # Delay after Alt press before first capture (seconds)
 INITIAL_DELAY = 0.4
 
-# Delays before each capture [pos1, pos2, pos3] (seconds)
-CAPTURE_DELAYS = [0.3, 0.4, 0.4]
+# Delays before each capture as ranges [pos1, pos2, pos3] (seconds)
+# Each entry is a tuple of (min, max) for random delay
+CAPTURE_DELAYS = [
+    (0.2, 0.4),  # First capture: 0.2-0.4s
+    (0.4, 0.6),  # Second capture: 0.4-0.6s
+    (0.4, 0.6),  # Third capture: 0.6s (fixed)
+]
 
 # Debounce time between Alt presses (seconds)
 ALT_DEBOUNCE_TIME = 0.5
@@ -93,6 +98,7 @@ STATUS_REGION_CROP = {
 }
 
 # End detection region crop coordinates and size (checked first, before status)
+# 1920x1080 857, 44
 END_REGION_CROP = {
     'x': 842,
     'y': 33,
@@ -157,9 +163,17 @@ def validate_config():
     # Validate timing settings
     if INITIAL_DELAY < 0:
         errors.append("INITIAL_DELAY must be non-negative")
-    
-    if any(delay < 0 for delay in CAPTURE_DELAYS):
-        errors.append("All CAPTURE_DELAYS must be non-negative")
+
+    # Validate CAPTURE_DELAYS ranges
+    for i, delay_range in enumerate(CAPTURE_DELAYS):
+        if not isinstance(delay_range, tuple) or len(delay_range) != 2:
+            errors.append(f"CAPTURE_DELAYS[{i}] must be a tuple of (min, max)")
+        else:
+            min_delay, max_delay = delay_range
+            if min_delay < 0 or max_delay < 0:
+                errors.append(f"CAPTURE_DELAYS[{i}] values must be non-negative")
+            if min_delay > max_delay:
+                errors.append(f"CAPTURE_DELAYS[{i}] min must be less than or equal to max")
     
     # Validate confidence thresholds
     if not (0 <= MIN_CONFIDENCE_FOR_ESP_ACTION <= 1):
