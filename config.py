@@ -50,6 +50,13 @@ RESOLUTION_CONFIGS = {
             'width': 15,
             'height': 11
         },
+        # PM detection region crop coordinates and size
+        "PM_REGION_CROP": {
+            'x': 28,
+            'y': 23,
+            'width': 14,
+            'height': 143
+        },
     },
     "1600x900": {
         # Crop coordinates for the 3 sequential glyph positions (x, y)
@@ -75,6 +82,14 @@ RESOLUTION_CONFIGS = {
             'width': 13,
             'height': 9
         },
+        # PM detection region crop coordinates and size
+        # TODO: Update these coordinates for 1600x900 resolution
+        "PM_REGION_CROP": {
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0
+        },
     }
 }
 
@@ -87,6 +102,7 @@ if _active_config is None:
 CROP_COORDINATES = _active_config["CROP_COORDINATES"]
 STATUS_REGION_CROP = _active_config["STATUS_REGION_CROP"]
 END_REGION_CROP = _active_config["END_REGION_CROP"]
+PM_REGION_CROP = _active_config["PM_REGION_CROP"]
 
 # ============================================================================
 # SCREEN CAPTURE SETTINGS
@@ -157,6 +173,7 @@ TEMPLATE_CONFIDENCE_THRESHOLD = 0.7
 STATUS_TEMPLATES_END = "templates/end"
 STATUS_TEMPLATES_ALT = "templates/alt"
 STATUS_TEMPLATES_WAIT = "templates/wait"
+STATUS_TEMPLATES_PM = "templates/pm"
 
 # Status monitoring timing
 STATUS_CHECK_DELAY_MIN = 2.3  # seconds - minimum delay between checks

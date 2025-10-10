@@ -206,6 +206,20 @@ class AltTriggeredAutomation:
         cropped = frame[y:y+height, x:x+width]
         return cropped
 
+    def _crop_pm_region(self, frame: np.ndarray) -> Optional[np.ndarray]:
+        """Crop frame to PM region for PM detection"""
+        x = config.PM_REGION_CROP['x']
+        y = config.PM_REGION_CROP['y']
+        width = config.PM_REGION_CROP['width']
+        height = config.PM_REGION_CROP['height']
+
+        if (y + height > frame.shape[0]) or (x + width > frame.shape[1]):
+            print(f" PM crop coordinates ({x}, {y}) + {width}x{height} exceed frame bounds {frame.shape}")
+            return None
+
+        cropped = frame[y:y+height, x:x+width]
+        return cropped
+
     def _process_classification(self, prediction: str, confidence: float, position: int) -> bool:
         """Process classification result and send appropriate ESP commands with random delay"""
 
@@ -453,6 +467,53 @@ class AltTriggeredAutomation:
 
         print(f" Q/E sequence completed! ({success_count}/{len(positions)} positions processed)")
 
+    def _check_pm_status(self) -> bool:
+        """Check for PM status after Q/E sequence. Returns True if PM detected."""
+        print(f"\n Checking PM status...")
+
+        # Small delay before PM check
+        time.sleep(0.3)
+
+        # Capture screenshot
+        frame = self._safe_grab()
+        if frame is None:
+            print(f"    Failed to capture frame for PM check")
+            return False
+
+        # Crop to PM region
+        pm_cropped = self._crop_pm_region(frame)
+        if pm_cropped is None:
+            print(f"    Failed to crop PM region")
+            return False
+
+        try:
+            # Convert to PIL for classification
+            pil_pm_img = Image.fromarray(cv2.cvtColor(pm_cropped, cv2.COLOR_BGR2GRAY))
+            pm_prediction, pm_confidence, _ = self.status_classifier.classify(pil_pm_img, region_type="pm")
+
+            print(f"    PM check: {pm_prediction} (conf: {pm_confidence:.3f})")
+
+            # Check if PM detected with sufficient confidence
+            if pm_prediction == "pm" and pm_confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
+                print(f"    PM detected! Confidence: {pm_confidence:.3f}")
+
+                # Send telegram message
+                try:
+                    message = f"PM detected! Confidence: {pm_confidence:.3f}\nReturning to idle state."
+                    asyncio.run(send_message(message))
+                    print(f"    Telegram message sent: PM detected")
+                except Exception as telegram_error:
+                    print(f"    Failed to send Telegram message: {telegram_error}")
+
+                return True
+            else:
+                print(f"    No PM detected")
+                return False
+
+        except Exception as e:
+            print(f"    PM classification error: {e}")
+            return False
+
     def _execute_sequence(self):
         """Execute the full 3-position capture sequence followed by status monitoring"""
         with self._lock:
@@ -467,8 +528,15 @@ class AltTriggeredAutomation:
             # Execute Q/E sequence
             self._execute_qe_sequence()
 
-            # Start status monitoring loop
-            self._status_monitoring_loop()
+            # Check for PM status after Q/E sequence
+            pm_detected = self._check_pm_status()
+
+            # Only proceed to status monitoring if no PM detected
+            if not pm_detected:
+                # Start status monitoring loop
+                self._status_monitoring_loop()
+            else:
+                print(f" PM detected - skipping status monitoring, returning to idle")
 
         except Exception as e:
             print(f" Sequence error: {e}")

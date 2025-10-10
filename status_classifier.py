@@ -8,9 +8,11 @@ from config import (
     STATUS_TEMPLATES_END,
     STATUS_TEMPLATES_ALT,
     STATUS_TEMPLATES_WAIT,
+    STATUS_TEMPLATES_PM,
     STATUS_CONFIDENCE_THRESHOLD,
     STATUS_REGION_CROP,
-    END_REGION_CROP
+    END_REGION_CROP,
+    PM_REGION_CROP
 )
 
 
@@ -18,34 +20,38 @@ class StatusClassifier:
     def __init__(self, end_templates_path: Optional[str] = None,
                  alt_templates_path: Optional[str] = None,
                  wait_templates_path: Optional[str] = None,
+                 pm_templates_path: Optional[str] = None,
                  confidence_threshold: Optional[float] = None):
         """
-        Initialize status classifier for end/alt/wait detection
+        Initialize status classifier for end/alt/wait/pm detection
 
         Args:
             end_templates_path: Path to 'end' templates folder
             alt_templates_path: Path to 'alt' templates folder
             wait_templates_path: Path to 'wait' templates folder
+            pm_templates_path: Path to 'pm' templates folder
             confidence_threshold: Minimum confidence for classification
         """
         self.end_path = end_templates_path or STATUS_TEMPLATES_END
         self.alt_path = alt_templates_path or STATUS_TEMPLATES_ALT
         self.wait_path = wait_templates_path or STATUS_TEMPLATES_WAIT
+        self.pm_path = pm_templates_path or STATUS_TEMPLATES_PM
         self.confidence_threshold = confidence_threshold or STATUS_CONFIDENCE_THRESHOLD
 
         # Create a temporary structure for the template classifier
         # The TemplateGlyphClassifier expects folders named by class
-        self.class_names = ['end', 'alt', 'wait']
+        self.class_names = ['end', 'alt', 'wait', 'pm']
 
         # We'll use the base TemplateGlyphClassifier with custom template loading
         self._load_templates()
 
     def _load_templates(self):
-        """Load end, alt and wait templates"""
+        """Load end, alt, wait and pm templates"""
         print(f"Loading status templates...")
         print(f"  End templates: {self.end_path}")
         print(f"  Alt templates: {self.alt_path}")
         print(f"  Wait templates: {self.wait_path}")
+        print(f"  PM templates: {self.pm_path}")
 
         # Verify paths exist
         if not os.path.exists(self.end_path):
@@ -57,17 +63,20 @@ class StatusClassifier:
         if not os.path.exists(self.wait_path):
             raise FileNotFoundError(f"Wait templates directory not found: {self.wait_path}")
 
+        if not os.path.exists(self.pm_path):
+            raise FileNotFoundError(f"PM templates directory not found: {self.pm_path}")
+
         # Create parent directory structure for TemplateGlyphClassifier
-        # We need a temporary parent that contains both 'alt' and 'wait' subdirs
+        # We need a temporary parent that contains 'alt', 'wait', 'end', and 'pm' subdirs
         parent_dir = os.path.dirname(self.alt_path.rstrip('/\\'))
 
         # Initialize the template classifier with the parent directory
-        # It will look for 'alt' and 'wait' subdirectories
+        # It will look for 'alt', 'wait', 'end', and 'pm' subdirectories
         try:
             # Create a custom templates path structure
             from glyph_classifier_template import TemplateGlyphClassifier
 
-            # Temporarily modify to support alt/wait instead of q/e
+            # Temporarily modify to support alt/wait/end/pm instead of q/e
             self.template_classifier = StatusTemplateClassifier(parent_dir)
             print(f"✅ Status templates loaded successfully")
 
@@ -77,11 +86,11 @@ class StatusClassifier:
 
     def classify(self, image: Image.Image, region_type: str = "status") -> Tuple[str, float, Dict]:
         """
-        Classify status image as 'end', 'alt', 'wait', or neither
+        Classify status image as 'end', 'alt', 'wait', 'pm', or neither
 
         Args:
             image: Input image to classify
-            region_type: "end" for end region (28x10), "status" for alt/wait region (331x14)
+            region_type: "end" for end region, "status" for alt/wait region, "pm" for pm region
 
         Returns:
             (prediction, confidence, details)
@@ -90,6 +99,9 @@ class StatusClassifier:
         if region_type == "end":
             expected_height = END_REGION_CROP['height']
             expected_width = END_REGION_CROP['width']
+        elif region_type == "pm":
+            expected_height = PM_REGION_CROP['height']
+            expected_width = PM_REGION_CROP['width']
         else:
             expected_height = STATUS_REGION_CROP['height']
             expected_width = STATUS_REGION_CROP['width']
@@ -121,23 +133,23 @@ class StatusClassifier:
 
 class StatusTemplateClassifier(TemplateGlyphClassifier):
     """
-    Custom template classifier for status detection (end/alt/wait)
-    Extends the base TemplateGlyphClassifier to use 'end', 'alt' and 'wait' instead of 'q' and 'e'
+    Custom template classifier for status detection (end/alt/wait/pm)
+    Extends the base TemplateGlyphClassifier to use 'end', 'alt', 'wait', and 'pm' instead of 'q' and 'e'
     """
 
     def __init__(self, templates_path: str, rotations: Optional[list] = None):
-        """Initialize with end/alt/wait templates"""
+        """Initialize with end/alt/wait/pm templates"""
         # Override class names
-        self.templates = {"end": [], "alt": [], "wait": []}
+        self.templates = {"end": [], "alt": [], "wait": [], "pm": []}
         self.rotations = rotations if rotations is not None else [0, -15, 15, -30, 30, -45, 45]
         self.templates_path = templates_path
-        self._template_stats = {"end": [], "alt": [], "wait": []}
+        self._template_stats = {"end": [], "alt": [], "wait": [], "pm": []}
         self.load_templates()
 
     def load_templates(self):
-        """Load and preprocess end/alt/wait template images with rotations"""
+        """Load and preprocess end/alt/wait/pm template images with rotations"""
         print("Loading status templates...")
-        for status in ["end", "alt", "wait"]:
+        for status in ["end", "alt", "wait", "pm"]:
             status_path = os.path.join(self.templates_path, status)
             if not os.path.exists(status_path):
                 raise FileNotFoundError(f"Status template directory not found: {status_path}")
@@ -149,9 +161,11 @@ class StatusTemplateClassifier(TemplateGlyphClassifier):
                     img = Image.open(img_path).convert('L')
 
                     # Resize to appropriate region size based on status type
-                    from config import STATUS_REGION_CROP, END_REGION_CROP
+                    from config import STATUS_REGION_CROP, END_REGION_CROP, PM_REGION_CROP
                     if status == "end":
                         target_size = (END_REGION_CROP['width'], END_REGION_CROP['height'])
+                    elif status == "pm":
+                        target_size = (PM_REGION_CROP['width'], PM_REGION_CROP['height'])
                     else:
                         target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
                     img = img.resize(target_size, Image.Resampling.LANCZOS)
@@ -183,16 +197,19 @@ class StatusTemplateClassifier(TemplateGlyphClassifier):
         Classify a status region image
         Args:
             image: Input image to classify
-            region_type: "end" for end region (28x10), "status" for alt/wait region (331x14)
+            region_type: "end" for end region, "status" for alt/wait region, "pm" for pm region
         Returns: (predicted_class, confidence, all_scores)
         """
         import numpy as np
-        from config import STATUS_REGION_CROP, END_REGION_CROP
+        from config import STATUS_REGION_CROP, END_REGION_CROP, PM_REGION_CROP
 
         # Ensure proper size and format based on region type
         if region_type == "end":
             target_size = (END_REGION_CROP['width'], END_REGION_CROP['height'])
             status_list = ["end"]
+        elif region_type == "pm":
+            target_size = (PM_REGION_CROP['width'], PM_REGION_CROP['height'])
+            status_list = ["pm"]
         else:
             target_size = (STATUS_REGION_CROP['width'], STATUS_REGION_CROP['height'])
             status_list = ["alt", "wait"]
