@@ -58,12 +58,13 @@ class AltTriggeredAutomation:
         self.save_dir = Path(save_dir or config.SCREENSHOTS_DIR)
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize window finder
+        # Initialize window finder (don't focus yet - do it after ESP init)
         self.info = find_window(title_contains=self.title_contains)
         if self.info is None:
             raise SystemExit(f"Window not found containing title: {self.title_contains}")
-        if bring_foreground if bring_foreground is not None else config.BRING_WINDOW_TO_FOREGROUND:
-            ensure_foreground(self.info.hwnd)
+
+        # Store bring_foreground preference for later
+        self._bring_foreground = bring_foreground if bring_foreground is not None else config.BRING_WINDOW_TO_FOREGROUND
 
         # Use config crop coordinates and size
         self._crop_coords = config.CROP_COORDINATES.copy()
@@ -110,6 +111,11 @@ class AltTriggeredAutomation:
         self.keyboard = KeyboardInterface(esp_port or "")
         if not self.keyboard.initialize():
             raise SystemExit(" Failed to initialize ESP32-S3 keyboard interface")
+
+        # Now bring window to foreground after ESP keyboard is ready
+        if self._bring_foreground:
+            print(" Bringing window to foreground...")
+            ensure_foreground(self.info.hwnd)
 
         print(" Alt-triggered automation ready!")
 
