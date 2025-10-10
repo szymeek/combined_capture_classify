@@ -132,7 +132,7 @@ class AltTriggeredAutomation:
         # Clamp to min/max range
         return max(self._esp_delay_min, min(self._esp_delay_max, delay))
 
-    def _get_thread_mss(self) -> mss.mss:
+    def _get_thread_mss(self):
         """Get or create mss instance for current thread"""
         thread_id = threading.get_ident()
 
