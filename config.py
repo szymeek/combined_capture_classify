@@ -50,12 +50,12 @@ RESOLUTION_CONFIGS = {
             'width': 15,
             'height': 11
         },
-        # PM detection region crop coordinates and size
+        # PM detection region crop coordinates and size (search area for 14x8 template)
         "PM_REGION_CROP": {
             'x': 28,
             'y': 23,
             'width': 14,
-            'height': 143
+            'height': 144
         },
     },
     "1600x900": {

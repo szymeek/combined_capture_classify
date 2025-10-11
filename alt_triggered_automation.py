@@ -468,7 +468,7 @@ class AltTriggeredAutomation:
         print(f" Q/E sequence completed! ({success_count}/{len(positions)} positions processed)")
 
     def _check_pm_status(self) -> bool:
-        """Check for PM status after Q/E sequence. Returns True if PM detected."""
+        """Check for PM status after Q/E sequence using template matching. Returns True if PM detected."""
         print(f"\n Checking PM status...")
 
         # Small delay before PM check
@@ -480,26 +480,41 @@ class AltTriggeredAutomation:
             print(f"    Failed to capture frame for PM check")
             return False
 
-        # Crop to PM region
-        pm_cropped = self._crop_pm_region(frame)
-        if pm_cropped is None:
-            print(f"    Failed to crop PM region")
+        # Crop to PM search region (larger area to search within)
+        pm_search_region = self._crop_pm_region(frame)
+        if pm_search_region is None:
+            print(f"    Failed to crop PM search region")
             return False
 
         try:
-            # Convert to PIL for classification
-            pil_pm_img = Image.fromarray(cv2.cvtColor(pm_cropped, cv2.COLOR_BGR2GRAY))
-            pm_prediction, pm_confidence, _ = self.status_classifier.classify(pil_pm_img, region_type="pm")
+            # Convert to grayscale for template matching
+            gray_region = cv2.cvtColor(pm_search_region, cv2.COLOR_BGR2GRAY)
 
-            print(f"    PM check: {pm_prediction} (conf: {pm_confidence:.3f})")
+            # Load PM template
+            import os
+            pm_template_path = os.path.join(config.STATUS_TEMPLATES_PM, "pm_1920.png")
+            if not os.path.exists(pm_template_path):
+                print(f"    PM template not found: {pm_template_path}")
+                return False
+
+            pm_template = cv2.imread(pm_template_path, cv2.IMREAD_GRAYSCALE)
+            if pm_template is None:
+                print(f"    Failed to load PM template")
+                return False
+
+            # Perform template matching
+            result = cv2.matchTemplate(gray_region, pm_template, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+            print(f"    PM template match confidence: {max_val:.3f}")
 
             # Check if PM detected with sufficient confidence
-            if pm_prediction == "pm" and pm_confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
-                print(f"    PM detected! Confidence: {pm_confidence:.3f}")
+            if max_val >= config.STATUS_CONFIDENCE_THRESHOLD:
+                print(f"    PM detected at location {max_loc}! Confidence: {max_val:.3f}")
 
                 # Send telegram message
                 try:
-                    message = f"PM detected! Confidence: {pm_confidence:.3f}\nReturning to idle state."
+                    message = f"PM detected! Confidence: {max_val:.3f}\nReturning to idle state."
                     asyncio.run(send_message(message))
                     print(f"    Telegram message sent: PM detected")
                 except Exception as telegram_error:
@@ -507,11 +522,13 @@ class AltTriggeredAutomation:
 
                 return True
             else:
-                print(f"    No PM detected")
+                print(f"    No PM detected (confidence too low: {max_val:.3f})")
                 return False
 
         except Exception as e:
-            print(f"    PM classification error: {e}")
+            print(f"    PM detection error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _execute_sequence(self):

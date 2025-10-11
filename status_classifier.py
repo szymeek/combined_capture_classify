@@ -78,10 +78,10 @@ class StatusClassifier:
 
             # Temporarily modify to support alt/wait/end/pm instead of q/e
             self.template_classifier = StatusTemplateClassifier(parent_dir)
-            print(f"✅ Status templates loaded successfully")
+            print(f"Status templates loaded successfully")
 
         except Exception as e:
-            print(f"❌ Failed to load status templates: {e}")
+            print(f"Failed to load status templates: {e}")
             raise
 
     def classify(self, image: Image.Image, region_type: str = "status") -> Tuple[str, float, Dict]:
