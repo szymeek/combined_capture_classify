@@ -25,7 +25,7 @@ RESULTS_CSV = "results.csv"
 
 # Active resolution - Change this to switch between resolutions
 # Options: "1920x1080" or "1600x900"
-ACTIVE_RESOLUTION = "1920x1080"
+ACTIVE_RESOLUTION = "1600x900"
 
 # Resolution-specific coordinate configurations
 RESOLUTION_CONFIGS = {
@@ -77,18 +77,18 @@ RESOLUTION_CONFIGS = {
         # End detection region crop coordinates and size
         # TODO: Update these coordinates for 1600x900 resolution
         "END_REGION_CROP": {
-            'x': 702,
-            'y': 28,
+            'x': 701,
+            'y': 27,
             'width': 13,
-            'height': 9
+            'height': 10
         },
         # PM detection region crop coordinates and size
         # TODO: Update these coordinates for 1600x900 resolution
         "PM_REGION_CROP": {
-            'x': 0,
-            'y': 0,
-            'width': 0,
-            'height': 0
+            'x': 24,
+            'y': 20,
+            'width': 14,
+            'height': 143
         },
     }
 }
