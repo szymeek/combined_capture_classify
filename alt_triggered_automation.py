@@ -343,7 +343,8 @@ class AltTriggeredAutomation:
                     iteration_count += 1
                     print(f"    Iteration {iteration_count}: Checking END - {end_prediction} (conf: {end_confidence:.3f})")
 
-                    if end_prediction == "end" and end_confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
+                    end_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get('end', config.STATUS_CONFIDENCE_THRESHOLD)
+                    if end_prediction == "end" and end_confidence >= end_threshold:
                         print(f"    END detected! Exiting to idle state...")
 
                         # Send telegram message
@@ -379,8 +380,11 @@ class AltTriggeredAutomation:
 
                 print(f"    Status check: {prediction} (conf: {confidence:.3f})")
 
+                # Get threshold for the specific status type
+                status_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get(prediction, config.STATUS_CONFIDENCE_THRESHOLD)
+
                 # Check if confident match
-                if confidence >= config.STATUS_CONFIDENCE_THRESHOLD:
+                if confidence >= status_threshold:
                     no_match_count = 0  # Reset retry counter
 
                     if prediction == "wait":
@@ -509,7 +513,8 @@ class AltTriggeredAutomation:
             print(f"    PM template match confidence: {max_val:.3f}")
 
             # Check if PM detected with sufficient confidence
-            if max_val >= config.STATUS_CONFIDENCE_THRESHOLD:
+            pm_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get('pm', config.STATUS_CONFIDENCE_THRESHOLD)
+            if max_val >= pm_threshold:
                 print(f"    PM detected at location {max_loc}! Confidence: {max_val:.3f}")
 
                 # Send telegram message

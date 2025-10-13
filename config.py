@@ -47,7 +47,7 @@ RESOLUTION_CONFIGS = {
         "END_REGION_CROP": {
             'x': 842,
             'y': 33,
-            'width': 15,
+            'width': 33,
             'height': 11
         },
         # PM detection region crop coordinates and size (search area for 14x8 template)
@@ -79,7 +79,7 @@ RESOLUTION_CONFIGS = {
         "END_REGION_CROP": {
             'x': 701,
             'y': 27,
-            'width': 13,
+            'width': 28,
             'height': 10
         },
         # PM detection region crop coordinates and size
@@ -177,13 +177,21 @@ STATUS_TEMPLATES_PM = "templates/pm"
 
 # Status monitoring timing
 STATUS_CHECK_DELAY_MIN = 2.3  # seconds - minimum delay between checks
-STATUS_CHECK_DELAY_MAX = 4.4  # seconds - maximum delay between checks
+STATUS_CHECK_DELAY_MAX = 3.7  # seconds - maximum delay between checks
 STATUS_INITIAL_WAIT = 0.2     # seconds - wait after last Q/E press before monitoring
 
 # Status monitoring thresholds and limits
-STATUS_CONFIDENCE_THRESHOLD = 0.8  # Higher threshold for status detection
+STATUS_CONFIDENCE_THRESHOLD = 0.8  # Default threshold for status detection (backwards compatibility)
 STATUS_MAX_RETRIES = 5             # Max retries before exiting on no match
 STATUS_MAX_ITERATIONS = 50         # Max loop iterations before forced exit
+
+# Individual confidence thresholds for each status type
+STATUS_CONFIDENCE_THRESHOLDS = {
+    'end': 0.9,   # End detection threshold
+    'alt': 0.8,   # Alt detection threshold
+    'wait': 0.8,  # Wait detection threshold
+    'pm': 0.8,    # PM detection threshold
+}
 
 # ============================================================================
 # WINDOW MANAGEMENT

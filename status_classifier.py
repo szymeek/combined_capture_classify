@@ -10,6 +10,7 @@ from config import (
     STATUS_TEMPLATES_WAIT,
     STATUS_TEMPLATES_PM,
     STATUS_CONFIDENCE_THRESHOLD,
+    STATUS_CONFIDENCE_THRESHOLDS,
     STATUS_REGION_CROP,
     END_REGION_CROP,
     PM_REGION_CROP
@@ -38,12 +39,19 @@ class StatusClassifier:
         self.pm_path = pm_templates_path or STATUS_TEMPLATES_PM
         self.confidence_threshold = confidence_threshold or STATUS_CONFIDENCE_THRESHOLD
 
+        # Individual thresholds for each status type
+        self.confidence_thresholds = STATUS_CONFIDENCE_THRESHOLDS.copy()
+
         # Create a temporary structure for the template classifier
         # The TemplateGlyphClassifier expects folders named by class
         self.class_names = ['end', 'alt', 'wait', 'pm']
 
         # We'll use the base TemplateGlyphClassifier with custom template loading
         self._load_templates()
+
+    def get_threshold(self, status_type: str) -> float:
+        """Get confidence threshold for a specific status type"""
+        return self.confidence_thresholds.get(status_type, self.confidence_threshold)
 
     def _load_templates(self):
         """Load end, alt, wait and pm templates"""
