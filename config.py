@@ -124,9 +124,9 @@ INITIAL_DELAY = 0.4
 # Delays before each capture as ranges [pos1, pos2, pos3] (seconds)
 # Each entry is a tuple of (min, max) for random delay
 CAPTURE_DELAYS = [
-    (0.2, 0.4),  # First capture: 0.2-0.4s
-    (0.4, 0.6),  # Second capture: 0.4-0.6s
-    (0.4, 0.6),  # Third capture: 0.6s (fixed)
+    (0.1, 0.4),  # First capture: 0.2-0.4s
+    (0.3, 0.6),  # Second capture: 0.4-0.6s
+    (0.3, 0.6),  # Third capture: 0.6s (fixed)
 ]
 
 # Debounce time between Alt presses (seconds)
@@ -177,7 +177,7 @@ STATUS_TEMPLATES_PM = "templates/pm"
 
 # Status monitoring timing
 STATUS_CHECK_DELAY_MIN = 2.3  # seconds - minimum delay between checks
-STATUS_CHECK_DELAY_MAX = 3.7  # seconds - maximum delay between checks
+STATUS_CHECK_DELAY_MAX = 3.2  # seconds - maximum delay between checks
 STATUS_INITIAL_WAIT = 0.2     # seconds - wait after last Q/E press before monitoring
 
 # Status monitoring thresholds and limits
