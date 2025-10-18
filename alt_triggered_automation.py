@@ -405,9 +405,17 @@ class AltTriggeredAutomation:
                         # Execute Q/E sequence
                         self._execute_qe_sequence()
 
-                        # After sequence, restart monitoring (recursive call)
-                        print(f"    Restarting status monitoring after Q/E sequence...")
-                        self._status_monitoring_loop()
+                        # Check for PM status after Q/E sequence
+                        pm_detected = self._check_pm_status()
+
+                        # Only proceed to status monitoring if no PM detected
+                        if not pm_detected:
+                            # After sequence, restart monitoring (recursive call)
+                            print(f"    Restarting status monitoring after Q/E sequence...")
+                            self._status_monitoring_loop()
+                        else:
+                            print(f"    PM detected after automated Alt - returning to idle")
+
                         return  # Exit this loop instance
 
                 else:
