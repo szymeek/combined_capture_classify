@@ -57,6 +57,11 @@ RESOLUTION_CONFIGS = {
             'width': 14,
             'height': 144
         },
+        # Level check pixel coordinates
+        "LEVEL_CHECK_PIXEL": {
+            'x': 169,
+            'y': 1033
+        },
     },
     "1600x900": {
         # Crop coordinates for the 3 sequential glyph positions (x, y)
@@ -90,6 +95,11 @@ RESOLUTION_CONFIGS = {
             'width': 14,
             'height': 143
         },
+        # Level check pixel coordinates
+        "LEVEL_CHECK_PIXEL": {
+            'x': 169,
+            'y': 853
+        },
     }
 }
 
@@ -103,6 +113,7 @@ CROP_COORDINATES = _active_config["CROP_COORDINATES"]
 STATUS_REGION_CROP = _active_config["STATUS_REGION_CROP"]
 END_REGION_CROP = _active_config["END_REGION_CROP"]
 PM_REGION_CROP = _active_config["PM_REGION_CROP"]
+LEVEL_CHECK_PIXEL = _active_config["LEVEL_CHECK_PIXEL"]
 
 # ============================================================================
 # SCREEN CAPTURE SETTINGS
@@ -192,6 +203,16 @@ STATUS_CONFIDENCE_THRESHOLDS = {
     'wait': 0.8,  # Wait detection threshold
     'pm': 0.8,    # PM detection threshold
 }
+
+# ============================================================================
+# LEVEL CHECK (PIXEL COLOR VERIFICATION)
+# ============================================================================
+
+# Level check configuration (single pixel color verification)
+# Note: LEVEL_CHECK_PIXEL is resolution-specific and loaded from RESOLUTION_CONFIGS above
+LEVEL_CHECK_ENABLED = True
+LEVEL_CHECK_EXPECTED_COLOR = (199, 0, 0)  # Expected RGB color (red)
+LEVEL_CHECK_COLOR_TOLERANCE = 10  # Tolerance for color matching (0-255)
 
 # ============================================================================
 # WINDOW MANAGEMENT

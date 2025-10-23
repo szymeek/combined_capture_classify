@@ -408,13 +408,18 @@ class AltTriggeredAutomation:
                         # Check for PM status after Q/E sequence
                         pm_detected = self._check_pm_status()
 
-                        # Only proceed to status monitoring if no PM detected
-                        if not pm_detected:
+                        # Only proceed if no PM detected
+                        if pm_detected:
+                            print(f"    PM detected after automated Alt - returning to idle")
+                        else:
+                            # Check level status after PM check
+                            self._check_level_status()
+                            # Note: Returns True (matched) or False (not matched)
+                            # Either way, we continue to status monitoring
+
                             # After sequence, restart monitoring (recursive call)
                             print(f"    Restarting status monitoring after Q/E sequence...")
                             self._status_monitoring_loop()
-                        else:
-                            print(f"    PM detected after automated Alt - returning to idle")
 
                         return  # Exit this loop instance
 
@@ -478,6 +483,73 @@ class AltTriggeredAutomation:
                 print(f"   ⚠️ Position {position} processing failed")
 
         print(f" Q/E sequence completed! ({success_count}/{len(positions)} positions processed)")
+
+    def _check_level_status(self) -> bool:
+        """
+        Check level status by verifying single pixel color.
+        Returns True if pixel matches expected color (level OK), False if not matched (send telegram)
+        """
+        if not config.LEVEL_CHECK_ENABLED:
+            return True  # Skip check if disabled
+
+        print(f"\n Checking level status...")
+
+        # Capture screenshot
+        frame = self._safe_grab()
+        if frame is None:
+            print(f"    Failed to capture frame for level check")
+            return True  # Assume OK if capture fails
+
+        try:
+            # Get pixel coordinates
+            x = config.LEVEL_CHECK_PIXEL['x']
+            y = config.LEVEL_CHECK_PIXEL['y']
+
+            # Check bounds
+            if y >= frame.shape[0] or x >= frame.shape[1]:
+                print(f"    Level check pixel ({x}, {y}) out of bounds {frame.shape}")
+                return True  # Assume OK if out of bounds
+
+            # Get pixel color (BGR format from OpenCV)
+            pixel_bgr = frame[y, x]
+            pixel_rgb = (int(pixel_bgr[2]), int(pixel_bgr[1]), int(pixel_bgr[0]))
+
+            # Expected color
+            expected_rgb = config.LEVEL_CHECK_EXPECTED_COLOR
+            tolerance = config.LEVEL_CHECK_COLOR_TOLERANCE
+
+            # Calculate color distance
+            r_diff = abs(pixel_rgb[0] - expected_rgb[0])
+            g_diff = abs(pixel_rgb[1] - expected_rgb[1])
+            b_diff = abs(pixel_rgb[2] - expected_rgb[2])
+
+            # Check if within tolerance
+            color_matches = (r_diff <= tolerance and g_diff <= tolerance and b_diff <= tolerance)
+
+            print(f"    Pixel at ({x}, {y}): RGB{pixel_rgb}")
+            print(f"    Expected: RGB{expected_rgb} ± {tolerance}")
+            print(f"    Match: {color_matches}")
+
+            if not color_matches:
+                # Color doesn't match - send telegram and continue monitoring
+                print(f"    Level check FAILED - sending Telegram message")
+                try:
+                    message = f"Level check FAILED!\nPixel at ({x}, {y}): RGB{pixel_rgb}\nExpected: RGB{expected_rgb} ± {tolerance}"
+                    asyncio.run(send_message(message))
+                    print(f"    Telegram message sent: Level check failed")
+                except Exception as telegram_error:
+                    print(f"    Failed to send Telegram message: {telegram_error}")
+                return False  # Not matched
+            else:
+                # Color matches - proceed normally
+                print(f"    Level check PASSED")
+                return True  # Matched
+
+        except Exception as e:
+            print(f"    Level check error: {e}")
+            import traceback
+            traceback.print_exc()
+            return True  # Assume OK on error
 
     def _check_pm_status(self) -> bool:
         """Check for PM status after Q/E sequence using template matching. Returns True if PM detected."""
@@ -561,12 +633,17 @@ class AltTriggeredAutomation:
             # Check for PM status after Q/E sequence
             pm_detected = self._check_pm_status()
 
-            # Only proceed to status monitoring if no PM detected
-            if not pm_detected:
+            # Only proceed if no PM detected
+            if pm_detected:
+                print(f" PM detected - skipping level check and status monitoring, returning to idle")
+            else:
+                # Check level status after PM check
+                self._check_level_status()
+                # Note: Returns True (matched) or False (not matched)
+                # Either way, we continue to status monitoring
+
                 # Start status monitoring loop
                 self._status_monitoring_loop()
-            else:
-                print(f" PM detected - skipping status monitoring, returning to idle")
 
         except Exception as e:
             print(f" Sequence error: {e}")
