@@ -125,8 +125,8 @@ INITIAL_DELAY = 0.4
 # Each entry is a tuple of (min, max) for random delay
 CAPTURE_DELAYS = [
     (0.1, 0.4),  # First capture: 0.2-0.4s
-    (0.3, 0.6),  # Second capture: 0.4-0.6s
-    (0.3, 0.6),  # Third capture: 0.6s (fixed)
+    (0.25, 0.5),  # Second capture: 0.4-0.6s
+    (0.25, 0.4),  # Third capture: 0.6s (fixed)
 ]
 
 # Debounce time between Alt presses (seconds)
