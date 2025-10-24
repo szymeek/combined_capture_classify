@@ -95,7 +95,14 @@ class AltTriggeredAutomation:
         # Initialize random seed for ESP delays
         random.seed()
 
-        # Initialize glyph classifier
+        # Initialize ESP32-S3 keyboard interface FIRST (before templates)
+        print(" Initializing ESP32-S3 keyboard interface...")
+        esp_port = esp_port or config.ESP32_PORT
+        self.keyboard = KeyboardInterface(esp_port or "")
+        if not self.keyboard.initialize():
+            raise SystemExit(" Failed to initialize ESP32-S3 keyboard interface")
+
+        # Initialize glyph classifier (after ESP)
         print(" Initializing template-based glyph classifier...")
         templates_path = templates_path or config.TEMPLATES_PATH
         confidence_threshold = confidence_threshold or config.TEMPLATE_CONFIDENCE_THRESHOLD
@@ -105,14 +112,7 @@ class AltTriggeredAutomation:
         print(" Initializing status classifier...")
         self.status_classifier = StatusClassifier()
 
-        # Initialize ESP32-S3 keyboard interface
-        print(" Initializing ESP32-S3 keyboard interface...")
-        esp_port = esp_port or config.ESP32_PORT
-        self.keyboard = KeyboardInterface(esp_port or "")
-        if not self.keyboard.initialize():
-            raise SystemExit(" Failed to initialize ESP32-S3 keyboard interface")
-
-        # Now bring window to foreground after ESP keyboard is ready
+        # Now bring window to foreground after everything is ready
         if self._bring_foreground:
             print(" Bringing window to foreground...")
             ensure_foreground(self.info.hwnd)
