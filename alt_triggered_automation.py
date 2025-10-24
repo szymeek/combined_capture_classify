@@ -39,7 +39,7 @@ from keyboard_interface import KeyboardInterface
 import config
 import mss
 
-from telegram_message import send_message
+from telegram_message import send_message, send_photo
 import asyncio
 
 class AltTriggeredAutomation:
@@ -597,13 +597,55 @@ class AltTriggeredAutomation:
             if max_val >= pm_threshold:
                 print(f"    PM detected at location {max_loc}! Confidence: {max_val:.3f}")
 
-                # Send telegram message
-                try:
-                    message = f"PM detected! Confidence: {max_val:.3f}\nReturning to idle state."
-                    asyncio.run(send_message(message))
-                    print(f"    Telegram message sent: PM detected")
-                except Exception as telegram_error:
-                    print(f"    Failed to send Telegram message: {telegram_error}")
+                # Send telegram message with screenshot if enabled
+                if config.PM_SEND_TELEGRAM:
+                    try:
+                        message = f"PM detected! Confidence: {max_val:.3f}\nReturning to idle state."
+
+                        # Send with screenshot if enabled
+                        if config.PM_SEND_SCREENSHOT:
+                            # Crop screenshot region
+                            x = config.PM_SCREENSHOT_REGION['x']
+                            y = config.PM_SCREENSHOT_REGION['y']
+                            width = config.PM_SCREENSHOT_REGION['width']
+                            height = config.PM_SCREENSHOT_REGION['height']
+
+                            # Check if region is configured
+                            if width > 0 and height > 0:
+                                # Get screenshot region
+                                if y + height <= frame.shape[0] and x + width <= frame.shape[1]:
+                                    screenshot_crop = frame[y:y+height, x:x+width]
+
+                                    # Save temporary screenshot
+                                    import tempfile
+                                    temp_dir = tempfile.gettempdir()
+                                    screenshot_path = os.path.join(temp_dir, f"pm_detected_{self._now_ms()}.png")
+                                    cv2.imwrite(screenshot_path, screenshot_crop)
+
+                                    # Send photo with caption
+                                    asyncio.run(send_photo(message, screenshot_path))
+                                    print(f"    Telegram photo sent: PM detected")
+
+                                    # Clean up temp file
+                                    try:
+                                        os.remove(screenshot_path)
+                                    except:
+                                        pass
+                                else:
+                                    print(f"    PM screenshot region out of bounds, sending text only")
+                                    asyncio.run(send_message(message))
+                                    print(f"    Telegram message sent: PM detected")
+                            else:
+                                print(f"    PM screenshot region not configured, sending text only")
+                                asyncio.run(send_message(message))
+                                print(f"    Telegram message sent: PM detected")
+                        else:
+                            # Send text only
+                            asyncio.run(send_message(message))
+                            print(f"    Telegram message sent: PM detected")
+
+                    except Exception as telegram_error:
+                        print(f"    Failed to send Telegram message: {telegram_error}")
 
                 return True
             else:

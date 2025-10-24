@@ -30,6 +30,34 @@ async def send_message(message: str):
         return False
 
 
+async def send_photo(message: str, photo_path: str):
+    """Send photo with caption via Telegram bot
+
+    Args:
+        message: Caption text for the photo
+        photo_path: Path to the image file
+
+    Set environment variables before using:
+    - TELEGRAM_BOT_TOKEN: Your bot token
+    - TELEGRAM_CHAT_ID: Your chat ID
+    """
+    if not TOKEN or not CHAT_ID:
+        print("⚠️ Telegram credentials not set. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables.")
+        return False
+
+    try:
+        # Initialize the bot
+        bot = Bot(token=TOKEN)
+
+        # Send the photo with caption
+        with open(photo_path, 'rb') as photo_file:
+            await bot.send_photo(chat_id=CHAT_ID, photo=photo_file, caption=message)
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send Telegram photo: {e}")
+        return False
+
+
 # direct https request
 # import requests
 

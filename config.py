@@ -62,6 +62,14 @@ RESOLUTION_CONFIGS = {
             'x': 169,
             'y': 1033
         },
+        # PM screenshot region (for Telegram message)
+        # TODO: Update these coordinates for 1920x1080 resolution
+        "PM_SCREENSHOT_REGION": {
+            'x': 0,
+            'y': 0,
+            'width': 0,
+            'height': 0
+        },
     },
     "1600x900": {
         # Crop coordinates for the 3 sequential glyph positions (x, y)
@@ -100,6 +108,13 @@ RESOLUTION_CONFIGS = {
             'x': 169,
             'y': 853
         },
+        # PM screenshot region (for Telegram message)
+        "PM_SCREENSHOT_REGION": {
+            'x': 21,
+            'y': 16,
+            'width': 471,  # 496 - 25 = 471
+            'height': 153  # 167 - 19 = 148
+        },
     }
 }
 
@@ -114,6 +129,7 @@ STATUS_REGION_CROP = _active_config["STATUS_REGION_CROP"]
 END_REGION_CROP = _active_config["END_REGION_CROP"]
 PM_REGION_CROP = _active_config["PM_REGION_CROP"]
 LEVEL_CHECK_PIXEL = _active_config["LEVEL_CHECK_PIXEL"]
+PM_SCREENSHOT_REGION = _active_config["PM_SCREENSHOT_REGION"]
 
 # ============================================================================
 # SCREEN CAPTURE SETTINGS
@@ -213,6 +229,15 @@ STATUS_CONFIDENCE_THRESHOLDS = {
 LEVEL_CHECK_ENABLED = True
 LEVEL_CHECK_EXPECTED_COLOR = (199, 0, 0)  # Expected RGB color (red)
 LEVEL_CHECK_COLOR_TOLERANCE = 10  # Tolerance for color matching (0-255)
+
+# ============================================================================
+# PM DETECTION TELEGRAM SETTINGS
+# ============================================================================
+
+# PM detection Telegram message settings
+PM_SEND_TELEGRAM = True  # Enable/disable Telegram message when PM is detected
+PM_SEND_SCREENSHOT = True  # Include screenshot with Telegram message
+# Note: PM_SCREENSHOT_REGION is resolution-specific and loaded from RESOLUTION_CONFIGS above
 
 # ============================================================================
 # WINDOW MANAGEMENT
