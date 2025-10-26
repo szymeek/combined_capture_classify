@@ -65,10 +65,10 @@ RESOLUTION_CONFIGS = {
         # PM screenshot region (for Telegram message)
         # TODO: Update these coordinates for 1920x1080 resolution
         "PM_SCREENSHOT_REGION": {
-            'x': 0,
-            'y': 0,
-            'width': 0,
-            'height': 0
+            'x': 28,
+            'y': 22,
+            'width': 466,
+            'height': 147
         },
     },
     "1600x900": {
