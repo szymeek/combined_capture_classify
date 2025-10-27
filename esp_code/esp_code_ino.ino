@@ -13,7 +13,7 @@ void setup() {
   // Open CDC serial for commands from PC
   Serial.begin(115200);
   Serial.println("ESP32-S3 HID Keyboard Ready");
-  Serial.println("Commands: ALT, Q, E");
+  Serial.println("Commands: ALT, Q, E, U");
   
   // Initialize random seed using analog noise
   randomSeed(analogRead(0) + micros());
@@ -54,6 +54,41 @@ void pressE() {
   Serial.println("ms");
 }
 
+void pressU() {
+  // Press 'u'
+  int holdTime1 = getRandomKeyDelay();
+  Keyboard.press('u');
+  delay(holdTime1);
+  Keyboard.release('u');
+  Serial.print("Pressed U for ");
+  Serial.print(holdTime1);
+  Serial.println("ms");
+  
+  // Small delay between keypresses
+  delay(getRandomKeyDelay());
+  
+  // Press '.'
+  int holdTime2 = getRandomKeyDelay();
+  Keyboard.press('.');
+  delay(holdTime2);
+  Keyboard.release('.');
+  Serial.print("Pressed . for ");
+  Serial.print(holdTime2);
+  Serial.println("ms");
+  
+  // Small delay between keypresses
+  delay(getRandomKeyDelay());
+  
+  // Press Enter
+  int holdTime3 = getRandomKeyDelay();
+  Keyboard.press(KEY_RETURN);
+  delay(holdTime3);
+  Keyboard.release(KEY_RETURN);
+  Serial.print("Pressed Enter for ");
+  Serial.print(holdTime3);
+  Serial.println("ms");
+}
+
 void loop() {
   // Check for commands on CDC
   static String buf;
@@ -72,10 +107,12 @@ void loop() {
           pressQ();
         } else if (cmd == "E") {
           pressE();
+        } else if (cmd == "U") {
+          pressU();
         } else {
           Serial.print("Unknown command: ");
           Serial.println(cmd);
-          Serial.println("Valid commands: ALT, Q, E");
+          Serial.println("Valid commands: ALT, Q, E, U");
         }
       }
     } else {
