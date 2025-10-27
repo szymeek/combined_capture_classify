@@ -43,6 +43,13 @@ class KeyboardInterface:
         print("⌨️  Pressing Q key...")
         return self.esp32.send_command("Q")
 
+    def press_u(self) -> bool:
+        if not self.connected:
+            print("❌ Keyboard not connected")
+            return False
+        print("⌨️  Pressing U key...")
+        return self.esp32.send_command("U")
+
     def press_character_key(self, character: str) -> bool:
         if character == 'E':
             return self.press_e()

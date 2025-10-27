@@ -240,6 +240,17 @@ PM_SEND_SCREENSHOT = True  # Include screenshot with Telegram message
 # Note: PM_SCREENSHOT_REGION is resolution-specific and loaded from RESOLUTION_CONFIGS above
 
 # ============================================================================
+# ANTI-AFK SETTINGS
+# ============================================================================
+
+# Anti-AFK state configuration
+ANTI_AFK_ENABLED = True  # Enable anti-AFK state instead of idle
+ANTI_AFK_REPEAT_COUNT = 5  # Number of times to send U key
+ANTI_AFK_DELAY_MIN = 305.0  # Minimum delay between U key presses (seconds)
+ANTI_AFK_DELAY_MAX = 550.0  # Maximum delay between U key presses (seconds)
+ANTI_AFK_SEND_TELEGRAM = True  # Send Telegram message after each U key press
+
+# ============================================================================
 # WINDOW MANAGEMENT
 # ============================================================================
 
