@@ -234,7 +234,8 @@ LEVEL_CHECK_COLOR_TOLERANCE = 10  # Tolerance for color matching (0-255)
 # PM DETECTION TELEGRAM SETTINGS
 # ============================================================================
 
-# PM detection Telegram message settings
+# PM detection settings
+PM_CHECK_ENABLED = True  # Enable/disable PM check after Q/E sequence
 PM_SEND_TELEGRAM = True  # Enable/disable Telegram message when PM is detected
 PM_SEND_SCREENSHOT = True  # Include screenshot with Telegram message
 # Note: PM_SCREENSHOT_REGION is resolution-specific and loaded from RESOLUTION_CONFIGS above

@@ -553,6 +553,12 @@ class AltTriggeredAutomation:
 
     def _check_pm_status(self) -> bool:
         """Check for PM status after Q/E sequence using template matching. Returns True if PM detected."""
+
+        # Check if PM check is enabled
+        if not config.PM_CHECK_ENABLED:
+            print(f"\n PM check disabled - skipping")
+            return False
+
         print(f"\n Checking PM status...")
 
         # Small delay before PM check
