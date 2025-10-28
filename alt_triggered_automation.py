@@ -75,6 +75,7 @@ class AltTriggeredAutomation:
         self._running = True
         self._processing_sequence = False  # Flag to prevent overlapping sequences
         self._stop_monitoring = False  # Flag to immediately stop monitoring loop (S key pressed)
+        self._pm_check_enabled = config.PM_CHECK_ENABLED  # Runtime PM check toggle
 
         self._last_alt_press = 0.0
         self._debounce_s = config.ALT_DEBOUNCE_TIME
@@ -554,8 +555,8 @@ class AltTriggeredAutomation:
     def _check_pm_status(self) -> bool:
         """Check for PM status after Q/E sequence using template matching. Returns True if PM detected."""
 
-        # Check if PM check is enabled
-        if not config.PM_CHECK_ENABLED:
+        # Check if PM check is enabled (use instance variable for runtime toggle)
+        if not self._pm_check_enabled:
             print(f"\n PM check disabled - skipping")
             return False
 
@@ -718,7 +719,7 @@ class AltTriggeredAutomation:
     def on_press(self, key) -> None:
         """Handle key press events"""
         try:
-            # Listen for Alt, S, and ESC keys
+            # Listen for Alt, S, K, and ESC keys
             if key in (keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt):
                 self._handle_alt_press()
             elif hasattr(key, 'char') and key.char and key.char.lower() == 's':
@@ -727,6 +728,12 @@ class AltTriggeredAutomation:
                 with self._lock:
                     self._stop_monitoring = True
                 print(" Ready for next Alt press...")
+            elif hasattr(key, 'char') and key.char and key.char.lower() == 'k':
+                # K key pressed - toggle PM check
+                with self._lock:
+                    self._pm_check_enabled = not self._pm_check_enabled
+                status = "ENABLED" if self._pm_check_enabled else "DISABLED"
+                print(f"\n K key pressed - PM check now {status}")
             elif key == keyboard.Key.esc:
                 print("\n ESC detected; exiting Alt-triggered automation...")
                 self._running = False
@@ -756,6 +763,7 @@ class AltTriggeredAutomation:
         print(" Controls:")
         print("   - Alt: Trigger capture sequence")
         print("   - S: IMMEDIATELY stop and return to idle (await Alt)")
+        print(f"   - K: Toggle PM check (currently: {'ENABLED' if self._pm_check_enabled else 'DISABLED'})")
         print("   - ESC: Exit the program")
         print()
         print(" Q/E Settings:")
@@ -779,6 +787,13 @@ class AltTriggeredAutomation:
         print(" ESP32 Settings:")
         print(f"   - Port: {self.keyboard.esp32.port}")
         print(f"   - Random delay range: {self._esp_delay_min}-{self._esp_delay_max}ms")
+        print()
+        print(" PM Check Settings:")
+        print(f"   - PM check: {'ENABLED' if self._pm_check_enabled else 'DISABLED'}")
+        print(f"   - PM region: ({config.PM_REGION_CROP['x']}, {config.PM_REGION_CROP['y']}) "
+              f"{config.PM_REGION_CROP['width']}x{config.PM_REGION_CROP['height']}")
+        print(f"   - Send Telegram: {config.PM_SEND_TELEGRAM}")
+        print(f"   - Include screenshot: {config.PM_SEND_SCREENSHOT}")
         print("=" * 70)
         print(" Ready! Press Alt to start...")
 
