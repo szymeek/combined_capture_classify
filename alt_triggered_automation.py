@@ -345,17 +345,17 @@ class AltTriggeredAutomation:
 
                     end_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get('end', config.STATUS_CONFIDENCE_THRESHOLD)
                     if end_prediction == "end" and end_confidence >= end_threshold:
-                        print(f"    END detected! Exiting to anti-AFK state...")
+                        print(f"    END detected! Exiting to idle state...")
 
                         # Send telegram message
                         try:
-                            message = f"END detected! Confidence: {end_confidence:.3f}\nExiting to anti-AFK state."
+                            message = f"END detected! Confidence: {end_confidence:.3f}\nExiting to idle state."
                             asyncio.run(send_message(message))
                             print(f"    Telegram message sent: END detected")
                         except Exception as telegram_error:
                             print(f"    Failed to send Telegram message: {telegram_error}")
 
-                        break  # Exit monitoring loop, go to anti-AFK
+                        break  # Exit monitoring loop, return to idle
 
                 except Exception as e:
                     print(f"    End classification error: {e}")
@@ -411,7 +411,6 @@ class AltTriggeredAutomation:
                         # Only proceed if no PM detected
                         if pm_detected:
                             print(f"    PM detected after automated Alt - returning to idle")
-                            return  # Exit this loop instance, go to idle
                         else:
                             # Check level status after PM check
                             self._check_level_status()
@@ -421,7 +420,8 @@ class AltTriggeredAutomation:
                             # After sequence, restart monitoring (recursive call)
                             print(f"    Restarting status monitoring after Q/E sequence...")
                             self._status_monitoring_loop()
-                            return  # Exit this loop instance after monitoring
+
+                        return  # Exit this loop instance
 
                 else:
                     # Low confidence - no clear match
@@ -452,21 +452,16 @@ class AltTriggeredAutomation:
                 exit_reason = "Monitoring stopped by S key"
                 self._stop_monitoring = False  # Reset flag
 
-        # Send telegram message and handle exit based on reason
-        if exit_reason == "Monitoring stopped by S key":
-            # S key pressed - return to idle
-            print(f"    Returning to idle state - waiting for human Alt press...")
-        else:
-            # Other reasons - enter anti-AFK state
+        # Send telegram message when returning to idle state (except for S key stop)
+        if exit_reason and exit_reason != "Monitoring stopped by S key":
             try:
-                message = f"Returning to Anti-AFK state.\nReason: {exit_reason}"
+                message = f"Returning to IDLE state.\nReason: {exit_reason}"
                 asyncio.run(send_message(message))
-                print(f"    Telegram message sent: Returning to anti-AFK")
+                print(f"    Telegram message sent: Returning to idle")
             except Exception as telegram_error:
                 print(f"    Failed to send Telegram message: {telegram_error}")
 
-            print(f"    Exiting status monitoring - entering anti-AFK state...")
-            self._anti_afk_state()
+        print(f"    Returning to idle state - waiting for human Alt press...")
 
     def _execute_qe_sequence(self):
         """Execute the Q/E capture sequence (positions 1, 2, 3)"""
@@ -488,51 +483,6 @@ class AltTriggeredAutomation:
                 print(f"   ⚠️ Position {position} processing failed")
 
         print(f" Q/E sequence completed! ({success_count}/{len(positions)} positions processed)")
-
-    def _anti_afk_state(self):
-        """
-        Anti-AFK state: Send U key periodically with random delays
-        """
-        if not config.ANTI_AFK_ENABLED:
-            print(f"\n Anti-AFK disabled - entering idle state...")
-            print(f"    Waiting for human Alt press...")
-            return
-
-        print(f"\n Entering Anti-AFK state...")
-        print(f"   Will send U key {config.ANTI_AFK_REPEAT_COUNT} times")
-        print(f"   Random delay range: {config.ANTI_AFK_DELAY_MIN}s - {config.ANTI_AFK_DELAY_MAX}s")
-
-        for i in range(config.ANTI_AFK_REPEAT_COUNT):
-            # Check if we should stop
-            if not self._running or self._stop_monitoring:
-                print(f"    Anti-AFK interrupted, returning to idle")
-                break
-
-            # Random delay before sending U key
-            delay = random.uniform(config.ANTI_AFK_DELAY_MIN, config.ANTI_AFK_DELAY_MAX)
-            print(f"\n    [{i+1}/{config.ANTI_AFK_REPEAT_COUNT}] Waiting {delay:.1f}s before sending U key...")
-            time.sleep(delay)
-
-            # Send U key to ESP32
-            print(f"    [{i+1}/{config.ANTI_AFK_REPEAT_COUNT}] Sending U key to ESP32...")
-            u_success = self.keyboard.press_u()
-
-            if u_success:
-                print(f"    Successfully sent U to ESP32-S3")
-
-                # Send telegram message if enabled
-                if config.ANTI_AFK_SEND_TELEGRAM:
-                    try:
-                        message = f"Anti-AFK: U key sent ({i+1}/{config.ANTI_AFK_REPEAT_COUNT})\nDelay was: {delay:.1f}s"
-                        asyncio.run(send_message(message))
-                        print(f"    Telegram message sent: Anti-AFK U key")
-                    except Exception as telegram_error:
-                        print(f"    Failed to send Telegram message: {telegram_error}")
-            else:
-                print(f"    Failed to send U to ESP32-S3")
-
-        print(f"\n Anti-AFK sequence completed!")
-        print(f"    Returning to idle state - waiting for human Alt press...")
 
     def _check_level_status(self) -> bool:
         """
@@ -728,7 +678,6 @@ class AltTriggeredAutomation:
             # Only proceed if no PM detected
             if pm_detected:
                 print(f" PM detected - skipping level check and status monitoring, returning to idle")
-                # Return to idle (do nothing, wait for next Alt press)
             else:
                 # Check level status after PM check
                 self._check_level_status()
@@ -771,7 +720,7 @@ class AltTriggeredAutomation:
                 print("\n S key pressed - stopping monitoring and returning to idle...")
                 with self._lock:
                     self._stop_monitoring = True
-                # Note: Idle state will be entered when status monitoring exits
+                print(" Ready for next Alt press...")
             elif key == keyboard.Key.esc:
                 print("\n ESC detected; exiting Alt-triggered automation...")
                 self._running = False
@@ -790,23 +739,17 @@ class AltTriggeredAutomation:
         print("   1. Press Alt to trigger MTA UI (human or auto)")
         print("   2. System captures & classifies Q/E glyph positions")
         print("   3. Random delay applied before each ESP command")
-        print("   4. Check for PM -> If detected: Return to IDLE (wait for Alt)")
-        print("   5. Check level pixel color -> Telegram if mismatch")
-        print("   6. Monitor status every 0.2-0.3s (priority order):")
-        print("      - 'end' -> Send Telegram + Enter Anti-AFK state")
-        print("      - 'wait' -> Keep monitoring")
-        print("      - 'alt' -> Auto-trigger Alt -> Repeat from step 2")
-        print("      - No match (5 retries) -> Enter Anti-AFK state")
-        print("   7. Max 50 iterations before forced Anti-AFK state")
-        print()
-        print(" Anti-AFK State:")
-        print(f"   - Send U key {config.ANTI_AFK_REPEAT_COUNT} times")
-        print(f"   - Random delay: {config.ANTI_AFK_DELAY_MIN}s - {config.ANTI_AFK_DELAY_MAX}s")
-        print(f"   - Telegram notification after each U key")
+        print("   4. After 3rd Q/E press: Wait 2.5s -> Status monitoring")
+        print("   5. Monitor status every 0.2-0.3s (priority order):")
+        print("      - 'end' (701,27 28x10) -> Send Telegram + Exit to idle")
+        print("      - 'wait' (634,60 331x14) -> Keep monitoring")
+        print("      - 'alt' (634,60 331x14) -> Auto-trigger Alt -> Repeat from step 2")
+        print("      - No match (5 retries) -> Return to idle")
+        print("   6. Max 50 iterations before forced exit to idle")
         print()
         print(" Controls:")
         print("   - Alt: Trigger capture sequence")
-        print("   - S: IMMEDIATELY stop and return to IDLE (wait for Alt)")
+        print("   - S: IMMEDIATELY stop and return to idle (await Alt)")
         print("   - ESC: Exit the program")
         print()
         print(" Q/E Settings:")
