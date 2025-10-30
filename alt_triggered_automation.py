@@ -311,164 +311,182 @@ class AltTriggeredAutomation:
 
     def _status_monitoring_loop(self):
         """Monitor status region for alt/wait detection after Q/E sequence"""
-        print(f"\n Starting status monitoring loop...")
+        print(f"\n🔍 Starting status monitoring loop...")
         print(f"   ⏱️ Initial wait: {config.STATUS_INITIAL_WAIT}s")
         time.sleep(config.STATUS_INITIAL_WAIT)
 
-        no_match_count = 0
-        iteration_count = 0
-        exit_reason = ""  # Track why we're exiting
+        # Main monitoring loop - use a flag to control when to continue monitoring
+        should_continue_monitoring = True
+        exit_reason = ""  # Initialize at function scope
 
-        while iteration_count < config.STATUS_MAX_ITERATIONS and self._running and not self._stop_monitoring:
-            # Random delay between checks
-            delay = random.uniform(config.STATUS_CHECK_DELAY_MIN, config.STATUS_CHECK_DELAY_MAX)
-            time.sleep(delay)
+        while should_continue_monitoring:
+            no_match_count = 0
+            iteration_count = 0
 
-            # Capture screenshot
-            frame = self._safe_grab()
-            if frame is None:
-                print(f"    Failed to capture frame in status monitoring")
-                no_match_count += 1
-                if no_match_count >= config.STATUS_MAX_RETRIES:
-                    print(f"    Too many capture failures, exiting monitoring loop")
-                    exit_reason = f"Too many capture failures ({config.STATUS_MAX_RETRIES} retries)"
-                    break
-                continue
+            while iteration_count < config.STATUS_MAX_ITERATIONS and self._running and not self._stop_monitoring:
+                # Random delay between checks
+                delay = random.uniform(config.STATUS_CHECK_DELAY_MIN, config.STATUS_CHECK_DELAY_MAX)
+                time.sleep(delay)
 
-            # FIRST: Check for 'end' status (takes priority)
-            end_cropped = self._crop_end_region(frame)
-            if end_cropped is not None:
+                # Capture screenshot
+                frame = self._safe_grab()
+                if frame is None:
+                    print(f"    ⚠️ Failed to capture frame in status monitoring")
+                    no_match_count += 1
+                    if no_match_count >= config.STATUS_MAX_RETRIES:
+                        print(f"    ❌ Too many capture failures, exiting monitoring loop")
+                        exit_reason = f"Too many capture failures ({config.STATUS_MAX_RETRIES} retries)"
+                        should_continue_monitoring = False
+                        break
+                    continue
+
+                # FIRST: Check for 'end' status (takes priority)
+                end_cropped = self._crop_end_region(frame)
+                if end_cropped is not None:
+                    try:
+                        pil_end_img = Image.fromarray(cv2.cvtColor(end_cropped, cv2.COLOR_BGR2GRAY))
+                        end_prediction, end_confidence, end_details = self.status_classifier.classify(pil_end_img, region_type="end")
+
+                        iteration_count += 1
+                        print(f"    📊 Iteration {iteration_count}: Checking END - {end_prediction} (conf: {end_confidence:.3f})")
+
+                        end_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get('end', config.STATUS_CONFIDENCE_THRESHOLD)
+                        if end_prediction == "end" and end_confidence >= end_threshold:
+                            print(f"    🏁 END detected! Exiting to anti-AFK state...")
+
+                            # Send telegram message
+                            try:
+                                message = f"END detected! Confidence: {end_confidence:.3f}\nEntering Anti-AFK state."
+                                asyncio.run(send_message(message))
+                                print(f"    ✅ Telegram message sent: END detected")
+                            except Exception as telegram_error:
+                                print(f"    ❌ Failed to send Telegram message: {telegram_error}")
+
+                            should_continue_monitoring = False
+                            break  # Exit monitoring loop, go to anti-AFK
+
+                    except Exception as e:
+                        print(f"    ⚠️ End classification error: {e}")
+
+                # SECOND: Check for 'alt' or 'wait' status
+                cropped = self._crop_status_region(frame)
+                if cropped is None:
+                    print(f"    ⚠️ Failed to crop status region")
+                    no_match_count += 1
+                    if no_match_count >= config.STATUS_MAX_RETRIES:
+                        print(f"    ❌ Too many crop failures, exiting monitoring loop")
+                        exit_reason = f"Too many crop failures ({config.STATUS_MAX_RETRIES} retries)"
+                        should_continue_monitoring = False
+                        break
+                    continue
+
+                # Convert to PIL for classification
+                pil_img = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY))
+
+                # Classify status region
                 try:
-                    pil_end_img = Image.fromarray(cv2.cvtColor(end_cropped, cv2.COLOR_BGR2GRAY))
-                    end_prediction, end_confidence, end_details = self.status_classifier.classify(pil_end_img, region_type="end")
+                    prediction, confidence, details = self.status_classifier.classify(pil_img, region_type="status")
 
-                    iteration_count += 1
-                    print(f"    Iteration {iteration_count}: Checking END - {end_prediction} (conf: {end_confidence:.3f})")
+                    print(f"    📊 Status check: {prediction} (conf: {confidence:.3f})")
 
-                    end_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get('end', config.STATUS_CONFIDENCE_THRESHOLD)
-                    if end_prediction == "end" and end_confidence >= end_threshold:
-                        print(f"    END detected! Exiting to anti-AFK state...")
+                    # Get threshold for the specific status type
+                    status_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get(prediction, config.STATUS_CONFIDENCE_THRESHOLD)
 
-                        # Send telegram message
-                        try:
-                            message = f"END detected! Confidence: {end_confidence:.3f}\nEntering Anti-AFK state."
-                            asyncio.run(send_message(message))
-                            print(f"    Telegram message sent: END detected")
-                        except Exception as telegram_error:
-                            print(f"    Failed to send Telegram message: {telegram_error}")
+                    # Check if confident match
+                    if confidence >= status_threshold:
+                        no_match_count = 0  # Reset retry counter
 
-                        break  # Exit monitoring loop, go to anti-AFK
+                        if prediction == "wait":
+                            # Keep waiting
+                            print(f"    ⏳ Status: WAIT - continuing monitoring...")
+                            continue
+
+                        elif prediction == "alt":
+                            # Trigger Alt and restart Q/E sequence
+                            print(f"    ⌨️ Status: ALT detected - triggering automated Alt press!")
+
+                            # Send Alt to ESP32
+                            if self.keyboard.press_alt():
+                                print(f"    ✅ Alt signal sent to ESP32")
+                            else:
+                                print(f"    ❌ Failed to send Alt to ESP32")
+
+                            # Execute Q/E sequence
+                            self._execute_qe_sequence()
+
+                            # Check for PM status after Q/E sequence
+                            pm_detected = self._check_pm_status()
+
+                            # Only proceed if no PM detected
+                            if pm_detected:
+                                print(f"    💬 PM detected after automated Alt - returning to idle")
+                                should_continue_monitoring = False
+                                return  # Exit completely
+                            else:
+                                # Check level status after PM check
+                                self._check_level_status()
+                                # Note: Returns True (matched) or False (not matched)
+                                # Either way, we continue to status monitoring
+
+                                # Reset counters and continue monitoring from the beginning
+                                print(f"    🔄 Restarting status monitoring after Q/E sequence...")
+                                no_match_count = 0
+                                iteration_count = 0
+                                time.sleep(config.STATUS_INITIAL_WAIT)
+                                continue
+
+                    else:
+                        # Low confidence - no clear match
+                        no_match_count += 1
+                        print(f"    ⚠️ Low confidence ({confidence:.3f}) - no match count: {no_match_count}/{config.STATUS_MAX_RETRIES}")
+
+                        if no_match_count >= config.STATUS_MAX_RETRIES:
+                            print(f"    ❌ Max retries reached, exiting monitoring loop")
+                            exit_reason = f"Max retries reached - low confidence matches ({config.STATUS_MAX_RETRIES} retries)"
+                            should_continue_monitoring = False
+                            break
 
                 except Exception as e:
-                    print(f"    End classification error: {e}")
-
-            # SECOND: Check for 'alt' or 'wait' status
-            cropped = self._crop_status_region(frame)
-            if cropped is None:
-                print(f"    Failed to crop status region")
-                no_match_count += 1
-                if no_match_count >= config.STATUS_MAX_RETRIES:
-                    print(f"    Too many crop failures, exiting monitoring loop")
-                    exit_reason = f"Too many crop failures ({config.STATUS_MAX_RETRIES} retries)"
-                    break
-                continue
-
-            # Convert to PIL for classification
-            pil_img = Image.fromarray(cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY))
-
-            # Classify status region
-            try:
-                prediction, confidence, details = self.status_classifier.classify(pil_img, region_type="status")
-
-                print(f"    Status check: {prediction} (conf: {confidence:.3f})")
-
-                # Get threshold for the specific status type
-                status_threshold = config.STATUS_CONFIDENCE_THRESHOLDS.get(prediction, config.STATUS_CONFIDENCE_THRESHOLD)
-
-                # Check if confident match
-                if confidence >= status_threshold:
-                    no_match_count = 0  # Reset retry counter
-
-                    if prediction == "wait":
-                        # Keep waiting
-                        print(f"    Status: WAIT - continuing monitoring...")
-                        continue
-
-                    elif prediction == "alt":
-                        # Trigger Alt and restart Q/E sequence
-                        print(f"    Status: ALT detected - triggering automated Alt press!")
-
-                        # Send Alt to ESP32
-                        if self.keyboard.press_alt():
-                            print(f"    Alt signal sent to ESP32")
-                        else:
-                            print(f"    Failed to send Alt to ESP32")
-
-                        # Execute Q/E sequence
-                        self._execute_qe_sequence()
-
-                        # Check for PM status after Q/E sequence
-                        pm_detected = self._check_pm_status()
-
-                        # Only proceed if no PM detected
-                        if pm_detected:
-                            print(f"    PM detected after automated Alt - returning to idle")
-                        else:
-                            # Check level status after PM check
-                            self._check_level_status()
-                            # Note: Returns True (matched) or False (not matched)
-                            # Either way, we continue to status monitoring
-
-                            # After sequence, restart monitoring (recursive call)
-                            print(f"    Restarting status monitoring after Q/E sequence...")
-                            self._status_monitoring_loop()
-
-                        return  # Exit this loop instance
-
-                else:
-                    # Low confidence - no clear match
+                    print(f"    ⚠️ Status classification error: {e}")
                     no_match_count += 1
-                    print(f"    Low confidence ({confidence:.3f}) - no match count: {no_match_count}/{config.STATUS_MAX_RETRIES}")
-
                     if no_match_count >= config.STATUS_MAX_RETRIES:
-                        print(f"    Max retries reached, exiting monitoring loop")
-                        exit_reason = f"Max retries reached - low confidence matches ({config.STATUS_MAX_RETRIES} retries)"
+                        print(f"    ❌ Too many errors, exiting monitoring loop")
+                        exit_reason = f"Too many classification errors ({config.STATUS_MAX_RETRIES} retries)"
+                        should_continue_monitoring = False
                         break
 
-            except Exception as e:
-                print(f"    Status classification error: {e}")
-                no_match_count += 1
-                if no_match_count >= config.STATUS_MAX_RETRIES:
-                    print(f"    Too many errors, exiting monitoring loop")
-                    exit_reason = f"Too many classification errors ({config.STATUS_MAX_RETRIES} retries)"
-                    break
+            # Check exit conditions
+            if not exit_reason and iteration_count >= config.STATUS_MAX_ITERATIONS:
+                print(f"    ⏱️ Max iterations ({config.STATUS_MAX_ITERATIONS}) reached, exiting monitoring")
+                exit_reason = f"Max iterations ({config.STATUS_MAX_ITERATIONS}) reached"
+                should_continue_monitoring = False
 
-        # Exit monitoring loop - set reason if not already set
-        if not exit_reason and iteration_count >= config.STATUS_MAX_ITERATIONS:
-            print(f"    Max iterations ({config.STATUS_MAX_ITERATIONS}) reached, exiting monitoring")
-            exit_reason = f"Max iterations ({config.STATUS_MAX_ITERATIONS}) reached"
+            with self._lock:
+                if self._stop_monitoring:
+                    print(f"    🛑 Monitoring stopped by S key")
+                    exit_reason = "Monitoring stopped by S key"
+                    self._stop_monitoring = False  # Reset flag
+                    should_continue_monitoring = False
 
-        with self._lock:
-            if self._stop_monitoring:
-                print(f"    Monitoring stopped by S key")
-                exit_reason = "Monitoring stopped by S key"
-                self._stop_monitoring = False  # Reset flag
+            # If we're exiting the inner loop, break outer loop too
+            if not should_continue_monitoring:
+                break
 
         # Handle exit based on reason
         if exit_reason == "Monitoring stopped by S key":
             # S key pressed - return to idle
-            print(f"    Returning to idle state - waiting for human Alt press...")
+            print(f"    ✅ Returning to idle state - waiting for human Alt press...")
         else:
             # Other reasons - enter anti-AFK state
             if exit_reason:
                 try:
                     message = f"Returning to Anti-AFK state.\nReason: {exit_reason}"
                     asyncio.run(send_message(message))
-                    print(f"    Telegram message sent: Entering anti-AFK")
+                    print(f"    ✅ Telegram message sent: Entering anti-AFK")
                 except Exception as telegram_error:
-                    print(f"    Failed to send Telegram message: {telegram_error}")
+                    print(f"    ❌ Failed to send Telegram message: {telegram_error}")
 
-            print(f"    Exiting status monitoring - entering anti-AFK state...")
+            print(f"    🔄 Exiting status monitoring - entering anti-AFK state...")
 
             # Reset processing flag before anti-AFK so Alt can be pressed during anti-AFK
             with self._lock:
@@ -513,11 +531,17 @@ class AltTriggeredAutomation:
         print(f"   Random delay range: {config.ANTI_AFK_DELAY_MIN}s - {config.ANTI_AFK_DELAY_MAX}s")
 
         for i in range(config.ANTI_AFK_REPEAT_COUNT):
-            # Check if we should stop
-            if not self._running or self._stop_monitoring:
-                print(f"    Anti-AFK interrupted by S key, returning to idle")
-                self._stop_monitoring = False  # Reset flag
-                break
+            # Check if we should stop (S key or new sequence started)
+            with self._lock:
+                if not self._running:
+                    return  # Program exiting
+                if self._stop_monitoring:
+                    print(f"    Anti-AFK interrupted by S key, returning to idle")
+                    self._stop_monitoring = False  # Reset flag
+                    return  # Exit to idle
+                if self._processing_sequence:
+                    print(f"    Anti-AFK interrupted by new sequence, exiting...")
+                    return  # Exit (new sequence running)
 
             # Random delay before sending U key (check for interruption every second)
             delay = random.uniform(config.ANTI_AFK_DELAY_MIN, config.ANTI_AFK_DELAY_MAX)
@@ -526,10 +550,14 @@ class AltTriggeredAutomation:
             # Sleep in small increments to allow interruption
             elapsed = 0.0
             while elapsed < delay:
-                if not self._running or self._stop_monitoring:
-                    print(f"    Anti-AFK interrupted by S key, returning to idle")
-                    self._stop_monitoring = False  # Reset flag
-                    return
+                with self._lock:
+                    if not self._running or self._stop_monitoring or self._processing_sequence:
+                        if self._stop_monitoring:
+                            print(f"    Anti-AFK interrupted by S key, returning to idle")
+                            self._stop_monitoring = False  # Reset flag
+                        elif self._processing_sequence:
+                            print(f"    Anti-AFK interrupted by new sequence, exiting...")
+                        return
                 time.sleep(min(1.0, delay - elapsed))  # Sleep 1s or remaining time
                 elapsed += 1.0
 
@@ -779,43 +807,59 @@ class AltTriggeredAutomation:
                 return
             self._last_alt_press = now
 
-        print(f"\n Alt pressed! Triggering capture sequence...")
+        print(f"\n⌨️ Alt pressed! Triggering capture sequence...")
 
         # Run sequence in a separate thread to avoid blocking key listener
-        sequence_thread = threading.Thread(target=self._execute_sequence, daemon=True)
+        sequence_thread = threading.Thread(target=self._execute_sequence, daemon=True, name="AutomationSequence")
         sequence_thread.start()
 
     def on_press(self, key) -> None:
         """Handle key press events"""
         try:
-            # Listen for Alt, S, K, and ESC keys
+            # Listen for Alt, S, P, K, and ESC keys
             if key in (keyboard.Key.alt_l, keyboard.Key.alt_r, keyboard.Key.alt):
+                # Check if we're already processing a sequence
+                with self._lock:
+                    if self._processing_sequence:
+                        print(f"\n⏭️  Alt press ignored - already processing a sequence")
+                        return
+
+                    # Check if there are already active sequence threads
+                    active_threads = [t for t in threading.enumerate() if t.name == "AutomationSequence" and t.is_alive()]
+                    if active_threads:
+                        print(f"\n⏭️  Alt press ignored - {len(active_threads)} sequence thread(s) already running")
+                        return
+
                 self._handle_alt_press()
+
             elif hasattr(key, 'char') and key.char and key.char.lower() == 's':
                 # S key pressed - immediately stop monitoring and return to idle
-                print("\n S key pressed - stopping monitoring and returning to idle...")
+                print("\n🛑 S key pressed - stopping monitoring and returning to idle...")
                 with self._lock:
                     self._stop_monitoring = True
-                print(" Ready for next Alt press...")
-            elif hasattr(key, 'char') and key.char and key.char.lower() == 'p':
-                # P key pressed - toggle PM check
+                print("✅ Ready for next Alt press...")
+
+            elif hasattr(key, 'char') and key.char == '[':
+                # [ key pressed - toggle PM check
                 with self._lock:
                     self._pm_check_enabled = not self._pm_check_enabled
                 pm_status = "ENABLED" if self._pm_check_enabled else "DISABLED"
-                print(f"\n P key pressed - PM check now: {pm_status}")
-            elif hasattr(key, 'char') and key.char and key.char.lower() == 'k':
-                # K key pressed - toggle Anti-AFK
+                print(f"\n🔄 [ key pressed - PM check now: {pm_status}")
+
+            elif hasattr(key, 'char') and key.char == ']':
+                # ] key pressed - toggle Anti-AFK
                 with self._lock:
                     self._anti_afk_enabled = not self._anti_afk_enabled
                 afk_status = "ENABLED" if self._anti_afk_enabled else "DISABLED"
-                print(f"\n K key pressed - Anti-AFK now: {afk_status}")
+                print(f"\n🔄 ] key pressed - Anti-AFK now: {afk_status}")
+
             elif key == keyboard.Key.esc:
-                print("\n ESC detected; exiting Alt-triggered automation...")
+                print("\n🛑 ESC detected; exiting Alt-triggered automation...")
                 self._running = False
                 raise StopIteration
 
         except Exception as exc:
-            print(f" Keypress error: {exc}")
+            print(f"❌ Keypress error: {exc}")
         return None
 
     def run(self) -> None:
@@ -844,8 +888,8 @@ class AltTriggeredAutomation:
         print(" Controls:")
         print("   - Alt: Trigger capture sequence")
         print("   - S: IMMEDIATELY stop and return to IDLE (wait for Alt)")
-        print(f"   - P: Toggle PM check (currently: {'ON' if self._pm_check_enabled else 'OFF'})")
-        print(f"   - K: Toggle Anti-AFK (currently: {'ON' if self._anti_afk_enabled else 'OFF'})")
+        print(f"   - [: Toggle PM check (currently: {'ON' if self._pm_check_enabled else 'OFF'})")
+        print(f"   - ]: Toggle Anti-AFK (currently: {'ON' if self._anti_afk_enabled else 'OFF'})")
         print("   - ESC: Exit the program")
         print()
         print(" Q/E Settings:")
