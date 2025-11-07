@@ -152,8 +152,8 @@ INITIAL_DELAY = 0.4
 # Each entry is a tuple of (min, max) for random delay
 CAPTURE_DELAYS = [
     (0.1, 0.4),  # First capture: 0.2-0.4s
-    (0.25, 0.5),  # Second capture: 0.4-0.6s
-    (0.25, 0.4),  # Third capture: 0.6s (fixed)
+    (0.25, 0.45),  # Second capture: 0.4-0.6s
+    (0.2, 0.35),  # Third capture: 0.6s (fixed)
 ]
 
 # Debounce time between Alt presses (seconds)
@@ -246,7 +246,7 @@ PM_SEND_SCREENSHOT = True  # Include screenshot with Telegram message
 
 # Anti-AFK state configuration
 ANTI_AFK_ENABLED = True  # Enable/disable anti-AFK state (instead of idle after END/no match)
-ANTI_AFK_REPEAT_COUNT = 10  # Number of times to send U key
+ANTI_AFK_REPEAT_COUNT = 20  # Number of times to send U key
 ANTI_AFK_DELAY_MIN = 355.0  # Minimum delay between U key presses (seconds)
 ANTI_AFK_DELAY_MAX = 545.0  # Maximum delay between U key presses (seconds)
 ANTI_AFK_SEND_TELEGRAM = True  # Send Telegram message after each U key press
